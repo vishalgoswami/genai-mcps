@@ -2,9 +2,10 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.database import engine, Base
+from src.database import engine, Base, SessionLocal
 from src.routers import servers, health
 from src.services.status_checker import start_status_checker
+from src import models
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
@@ -22,6 +23,44 @@ class Settings(BaseSettings):
 settings = Settings()
 
 Base.metadata.create_all(bind=engine)
+
+# ── Default MCP servers to seed on first run ─────────────────────────────────
+_DEFAULT_SERVERS = [
+    {
+        "name": "weather",
+        "description": "US weather alerts & forecasts (NWS API)",
+        "url": "http://weather-server:9002/mcp",
+        "tags": "weather,nws,alerts,forecasts",
+        "owner": "platform",
+        "auth_type": "oauth",
+    },
+    {
+        "name": "stock",
+        "description": "Stock prices, history & company info",
+        "url": "http://stock-server:9003/mcp",
+        "tags": "stock,finance,market",
+        "owner": "platform",
+        "auth_type": "oauth",
+    },
+]
+
+
+def _seed_default_servers():
+    """Insert default MCP servers if they don't already exist."""
+    db = SessionLocal()
+    try:
+        for entry in _DEFAULT_SERVERS:
+            exists = db.query(models.MCPServer).filter(
+                models.MCPServer.name == entry["name"]
+            ).first()
+            if not exists:
+                db.add(models.MCPServer(**entry))
+        db.commit()
+    finally:
+        db.close()
+
+
+_seed_default_servers()
 
 app = FastAPI(
     title="MCP Registry",

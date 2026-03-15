@@ -14,9 +14,18 @@
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
-      "webOrigins": ["*"],
-      "defaultClientScopes": ["openid", "profile", "email"]
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
     },
     {
       "clientId": "stock-server",
@@ -28,9 +37,18 @@
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
-      "webOrigins": ["*"],
-      "defaultClientScopes": ["openid", "profile", "email"]
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
     },
     {
       "clientId": "mcp-gateway",
@@ -42,9 +60,18 @@
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
-      "webOrigins": ["*"],
-      "defaultClientScopes": ["openid", "profile", "email"]
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
     },
     {
       "clientId": "adk-agui-client",
@@ -56,9 +83,18 @@
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
-      "webOrigins": ["*"],
-      "defaultClientScopes": ["openid", "profile", "email"]
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
     },
     {
       "clientId": "cli-client",
@@ -70,9 +106,18 @@
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
-      "webOrigins": ["*"],
-      "defaultClientScopes": ["openid", "profile", "email"]
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
     },
     {
       "clientId": "langgraph-client",
@@ -84,9 +129,18 @@
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
-      "webOrigins": ["*"],
-      "defaultClientScopes": ["openid", "profile", "email"]
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
     },
     {
       "clientId": "mcp-client",
@@ -95,9 +149,41 @@
       "publicClient": true,
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
-      "webOrigins": ["*"],
-      "defaultClientScopes": ["openid", "profile", "email"]
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "mcp-registry",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "registry-secret",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
     }
   ],
   "users": [
@@ -114,7 +200,9 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["default-roles-mcp"]
+      "realmRoles": [
+        "default-roles-mcp"
+      ]
     }
   ],
   "roles": {
