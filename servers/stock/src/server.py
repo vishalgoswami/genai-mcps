@@ -1,23 +1,45 @@
 """
-Stock Price MCP Server — streamable HTTP transport with optional OAuth (Keycloak).
+Stock Price MCP Server — supports stdio, SSE, and streamable HTTP transports.
 
 Exposes tools via MCP:
   - get_stock_price(symbol)          → current quote for a ticker symbol
   - get_stock_history(symbol, days)  → recent daily closing prices
   - get_company_info(symbol)         → basic company profile
 
+Usage:
+  stock-server              # stdio (default, for local/dev use)
+  stock-server --transport sse
+  stock-server --transport streamable-http
+  stock-server --transport streamable-http --host 0.0.0.0 --port 9003
+
 Data source: Yahoo Finance via the yfinance library (no API key required).
 """
 from __future__ import annotations
 
+import argparse
 import os
 from typing import Any
 
 import yfinance as yf
 from mcp.server.fastmcp import FastMCP
 
+# ── Parse CLI args early so host/port can be passed to FastMCP ───────────────
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Stock Price MCP Server")
+    p.add_argument(
+        "--transport", "-t",
+        choices=["stdio", "sse", "streamable-http"],
+        default=os.getenv("MCP_TRANSPORT", "stdio"),
+        help="Transport protocol (default: stdio, or MCP_TRANSPORT env var)",
+    )
+    p.add_argument("--host", default=os.getenv("MCP_HOST", "127.0.0.1"), help="Bind host (default: 127.0.0.1)")
+    p.add_argument("--port", type=int, default=int(os.getenv("MCP_PORT", "9003")), help="Bind port (default: 9003)")
+    return p.parse_args()
+
+_args = _parse_args()
+
 # ── FastMCP instance ─────────────────────────────────────────────────────────
-mcp = FastMCP("stock")
+mcp = FastMCP("stock", host=_args.host, port=_args.port)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,26 +145,11 @@ async def get_company_info(symbol: str) -> str:
         return f"Error fetching company info for '{symbol}': {e}"
 
 
-# ── Entry point — streamable HTTP with optional OAuth ─────────────────────────
+# ── Entry point ───────────────────────────────────────────────────────────────
 def main():
-    MCP_AUTH_ENABLED = os.getenv("MCP_AUTH_ENABLED", "false").lower() == "true"
-
-    if MCP_AUTH_ENABLED:
-        import sys
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "shared"))
-        from mcp_utils.oauth_middleware import OAuthMiddleware
-        from starlette.middleware import Middleware
-
-        print("[stock] OAuth enabled — tokens validated against Keycloak")
-        mcp.run(
-            transport="streamable-http",
-            host="0.0.0.0",
-            port=9003,
-            middleware=[Middleware(OAuthMiddleware)],
-        )
-    else:
-        print("[stock] OAuth disabled — open access")
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=9003)
+    transport = _args.transport
+    print(f"[stock] Starting with transport={transport}, host={_args.host}, port={_args.port}")
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":

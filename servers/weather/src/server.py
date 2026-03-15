@@ -1,20 +1,42 @@
 """
-Weather MCP Server — streamable HTTP transport with optional OAuth (Keycloak).
+Weather MCP Server — supports stdio, SSE, and streamable HTTP transports.
 
 Exposes two tools via MCP:
   - get_alerts(state)    → active weather alerts for a US state
   - get_forecast(lat, lon) → 5-period weather forecast for a location
 
+Usage:
+  weather-server              # stdio (default, for local/dev use)
+  weather-server --transport sse
+  weather-server --transport streamable-http
+  weather-server --transport streamable-http --host 0.0.0.0 --port 9002
+
 Reference: https://modelcontextprotocol.io/docs/develop/build-server
 Data source: US National Weather Service API (https://api.weather.gov)
 """
 from typing import Any
+import argparse
 import os
 import httpx
 from mcp.server.fastmcp import FastMCP
 
+# ── Parse CLI args early so host/port can be passed to FastMCP ───────────────
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Weather MCP Server")
+    p.add_argument(
+        "--transport", "-t",
+        choices=["stdio", "sse", "streamable-http"],
+        default=os.getenv("MCP_TRANSPORT", "stdio"),
+        help="Transport protocol (default: stdio, or MCP_TRANSPORT env var)",
+    )
+    p.add_argument("--host", default=os.getenv("MCP_HOST", "127.0.0.1"), help="Bind host (default: 127.0.0.1)")
+    p.add_argument("--port", type=int, default=int(os.getenv("MCP_PORT", "9002")), help="Bind port (default: 9002)")
+    return p.parse_args()
+
+_args = _parse_args()
+
 # ── FastMCP instance ─────────────────────────────────────────────────────────
-mcp = FastMCP("weather")
+mcp = FastMCP("weather", host=_args.host, port=_args.port)
 
 # ── Constants ────────────────────────────────────────────────────────────────
 NWS_API_BASE = "https://api.weather.gov"
@@ -106,28 +128,15 @@ async def get_forecast(latitude: float, longitude: float) -> str:
     return "\n---\n".join(forecasts)
 
 
-# ── Entry point — streamable HTTP with optional OAuth ─────────────────────────
+# ── Entry point ───────────────────────────────────────────────────────────────
 def main():
-    MCP_AUTH_ENABLED = os.getenv("MCP_AUTH_ENABLED", "false").lower() == "true"
+    transport = _args.transport
+    print(f"[weather] Starting with transport={transport}, host={_args.host}, port={_args.port}")
+    mcp.run(transport=transport)
 
-    if MCP_AUTH_ENABLED:
-        # Wrap FastMCP's ASGI app with OAuth middleware
-        import sys
-        # Add shared lib to path so we can import oauth_middleware
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "shared"))
-        from mcp_utils.oauth_middleware import OAuthMiddleware
-        from starlette.middleware import Middleware
 
-        print("[weather] OAuth enabled — tokens validated against Keycloak")
-        mcp.run(
-            transport="streamable-http",
-            host="0.0.0.0",
-            port=9002,
-            middleware=[Middleware(OAuthMiddleware)],
-        )
-    else:
-        print("[weather] OAuth disabled — open access")
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=9002)
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
