@@ -1,47 +1,100 @@
 """
-Google ADK supervisor agent with multi-server MCP tool integration.
+Google ADK supervisor agent with pluggable multi-server MCP tool integration.
 
 Connects to one or many remote MCP servers via streamable HTTP,
 discovers all available tools, and acts as a supervisor agent that
 can route user queries to the right tools across any configured server.
 
-When MCP_AUTH_ENABLED=true, performs a client_credentials OAuth2 grant
-against Keycloak and passes the Bearer token to every MCP server.
+Each server can independently have OAuth enabled or disabled, making it
+easy to mix public and protected servers.
 
-Configure servers via comma-separated MCP_SERVER_URLS env var:
+─── Configuration ─────────────────────────────────────────────────────────
+
+Option 1 — JSON config (recommended, per-server auth control):
+
+  MCP_SERVERS='[
+    {"url": "http://localhost:9002/mcp", "auth": true},
+    {"url": "http://localhost:9003/mcp", "auth": true},
+    {"url": "http://localhost:9004/mcp", "auth": false}
+  ]'
+
+  Each entry supports:
+    url   (required) — MCP server URL
+    auth  (optional) — true/false, default false
+
+Option 2 — Simple comma-separated URLs (all-or-nothing auth via MCP_AUTH_ENABLED):
+
   MCP_SERVER_URLS=http://localhost:9002/mcp,http://localhost:9003/mcp
+  MCP_AUTH_ENABLED=true   # applies to ALL servers
+
+Global OAuth settings (used when auth=true for a server):
+  KEYCLOAK_URL, KEYCLOAK_REALM, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET
 """
 from __future__ import annotations
 
+import json
 import os
+from dataclasses import dataclass, field
 
 import httpx
 from google.adk.agents import LlmAgent
 from google.adk.tools.mcp_tool import MCPToolset, StreamableHTTPConnectionParams
 
 
-# ── Configuration ────────────────────────────────────────────────────────────
-MCP_SERVER_URLS = os.getenv(
-    "MCP_SERVER_URLS",
-    os.getenv("MCP_SERVER_URL", "http://localhost:9002/mcp"),
-)
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
-
-# OAuth settings (optional)
-MCP_AUTH_ENABLED = os.getenv("MCP_AUTH_ENABLED", "false").lower() == "true"
+# ── Global OAuth settings ────────────────────────────────────────────────────
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://localhost:8180")
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "mcp")
 OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID", "adk-agui-client")
 OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET", "adk-agui-secret")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
 
 
-def _parse_server_urls(urls_str: str) -> list[str]:
-    """Parse comma-separated MCP server URLs into a list."""
-    return [u.strip() for u in urls_str.split(",") if u.strip()]
+@dataclass
+class MCPServerConfig:
+    """Configuration for a single MCP server connection."""
+    url: str
+    auth: bool = False
+    headers: dict[str, str] = field(default_factory=dict)
+
+
+def _load_server_configs() -> list[MCPServerConfig]:
+    """
+    Load MCP server configurations from environment.
+
+    Supports two formats:
+      1. MCP_SERVERS — JSON array with per-server auth control (preferred)
+      2. MCP_SERVER_URLS — comma-separated URLs, global MCP_AUTH_ENABLED flag
+    """
+    # Option 1: JSON config (per-server auth)
+    raw_json = os.getenv("MCP_SERVERS")
+    if raw_json:
+        entries = json.loads(raw_json)
+        return [
+            MCPServerConfig(url=e["url"], auth=e.get("auth", False))
+            for e in entries
+        ]
+
+    # Option 2: Comma-separated URLs (legacy, all-or-nothing auth)
+    urls_str = os.getenv(
+        "MCP_SERVER_URLS",
+        os.getenv("MCP_SERVER_URL", "http://localhost:9002/mcp"),
+    )
+    global_auth = os.getenv("MCP_AUTH_ENABLED", "false").lower() == "true"
+    return [
+        MCPServerConfig(url=u.strip(), auth=global_auth)
+        for u in urls_str.split(",") if u.strip()
+    ]
+
+
+_token_cache: str | None = None
 
 
 def _fetch_oauth_token() -> str:
-    """Perform OAuth2 client_credentials grant against Keycloak (synchronous)."""
+    """Perform OAuth2 client_credentials grant against Keycloak (cached)."""
+    global _token_cache
+    if _token_cache:
+        return _token_cache
+
     token_url = f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/token"
     resp = httpx.post(
         token_url,
@@ -53,9 +106,9 @@ def _fetch_oauth_token() -> str:
         timeout=10,
     )
     resp.raise_for_status()
-    token = resp.json()["access_token"]
+    _token_cache = resp.json()["access_token"]
     print(f"[adk-agui] OAuth token acquired from {token_url}")
-    return token
+    return _token_cache
 
 
 def build_agent() -> LlmAgent:
@@ -63,31 +116,29 @@ def build_agent() -> LlmAgent:
     Create an ADK supervisor agent with tools auto-discovered from
     all configured MCP servers (streamable HTTP).
 
-    When MCP_AUTH_ENABLED=true, fetches a Bearer token from Keycloak
-    via client_credentials grant and injects it into every MCP connection.
+    Each server's OAuth is controlled independently via its config.
     """
-    server_urls = _parse_server_urls(MCP_SERVER_URLS)
+    configs = _load_server_configs()
+    mcp_toolsets: list[MCPToolset] = []
 
-    # Build auth headers if OAuth is enabled
-    headers: dict[str, str] | None = None
-    if MCP_AUTH_ENABLED:
-        token = _fetch_oauth_token()
-        headers = {"Authorization": f"Bearer {token}"}
-        print("[adk-agui] OAuth enabled — Bearer token will be sent to all MCP servers")
+    for cfg in configs:
+        headers: dict[str, str] = dict(cfg.headers)
+        if cfg.auth:
+            token = _fetch_oauth_token()
+            headers["Authorization"] = f"Bearer {token}"
 
-    # Create one MCPToolset per server
-    mcp_toolsets = [
-        MCPToolset(
-            connection_params=StreamableHTTPConnectionParams(
-                url=url,
-                headers=headers,
-            ),
+        mcp_toolsets.append(
+            MCPToolset(
+                connection_params=StreamableHTTPConnectionParams(
+                    url=cfg.url,
+                    headers=headers or None,
+                ),
+            )
         )
-        for url in server_urls
-    ]
+        label = "🔒 auth" if cfg.auth else "🔓 public"
+        print(f"[adk-agui]   {label}  {cfg.url}")
 
-    server_list = "\n".join(f"  - {url}" for url in server_urls)
-    print(f"[adk-agui] Connecting to {len(server_urls)} MCP server(s):\n{server_list}")
+    print(f"[adk-agui] Configured {len(configs)} MCP server(s)")
 
     agent = LlmAgent(
         name="mcp_supervisor",

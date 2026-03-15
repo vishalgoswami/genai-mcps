@@ -4,7 +4,7 @@ services:
   # ── Keycloak OIDC Provider ───────────────────────
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
-    command: start-dev --import-realm
+    command: start-dev --import-realm --hostname http://localhost:8180 --hostname-backchannel-dynamic true
     ports:
       - "8180:8080"
     environment:
@@ -13,7 +13,7 @@ services:
     volumes:
       - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '\"status\":\"UP\"'"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /realms/master HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && timeout 2 cat <&3 | grep -q '200 OK'"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -31,11 +31,13 @@ services:
       MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-mcp}
+      OAUTH_CLIENT_ID: weather-server
+      OAUTH_CLIENT_SECRET: weather-server-secret
     depends_on:
       keycloak:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9002/mcp"]
+      test: ["CMD", "python", "-c", "import urllib.request,urllib.error;\ntry: urllib.request.urlopen('http://localhost:9002/mcp')\nexcept urllib.error.HTTPError: pass"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -51,11 +53,13 @@ services:
       MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-mcp}
+      OAUTH_CLIENT_ID: stock-server
+      OAUTH_CLIENT_SECRET: stock-server-secret
     depends_on:
       keycloak:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9003/mcp"]
+      test: ["CMD", "python", "-c", "import urllib.request,urllib.error;\ntry: urllib.request.urlopen('http://localhost:9003/mcp')\nexcept urllib.error.HTTPError: pass"]
       interval: 30s
       timeout: 5s
       retries: 3
