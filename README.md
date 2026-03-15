@@ -463,6 +463,16 @@ All servers share the same auth setting. Simpler, but less flexible.
 
 ## Changelog
 
+### v0.4.0 — MCP Registry with Docker Deploy & OAuth-Aware Status Checker
+
+- **Registry Docker deployment**: Backend (python:3.12-slim) and frontend (node+nginx multi-stage) Dockerfiles added to docker-compose
+- **MCP JSON-RPC status checker**: Rewrote status checker to use proper MCP protocol — sends `initialize` then `tools/list` JSON-RPC messages instead of ad-hoc HTTP
+- **OAuth token exchange**: Registry backend fetches Bearer tokens from Keycloak via `client_credentials` grant to probe OAuth-protected MCP servers
+- **SSE response parsing**: Status checker handles both SSE (`event: message\ndata: {...}`) and plain JSON responses from MCP servers
+- **Seed data on startup**: Weather and stock MCP servers auto-registered in the registry with correct Docker-internal URLs and `auth_type=oauth`
+- **`mcp-registry` Keycloak client**: New confidential client added to `realm-export.json` with service account enabled
+- **Frontend build config**: Added `tsconfig.json`, `tailwind.config.js`, `postcss.config.js`, and `vite-env.d.ts`
+
 ### v0.3.0 — Pluggable Client Config & Architecture Docs
 
 - **Per-server OAuth control**: New `MCPServerConfig` dataclass in the ADK client — each MCP server independently enables/disables OAuth via the `MCP_SERVERS` JSON env var
