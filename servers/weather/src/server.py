@@ -19,6 +19,7 @@ import argparse
 import os
 import httpx
 from mcp.server.fastmcp import FastMCP
+from mcp.server.auth.settings import AuthSettings
 
 # ── Parse CLI args early so host/port can be passed to FastMCP ───────────────
 def _parse_args() -> argparse.Namespace:
@@ -35,8 +36,36 @@ def _parse_args() -> argparse.Namespace:
 
 _args = _parse_args()
 
-# ── FastMCP instance ─────────────────────────────────────────────────────────
-mcp = FastMCP("weather", host=_args.host, port=_args.port)
+# ── OAuth configuration (optional, gated by MCP_AUTH_ENABLED) ────────────────
+_AUTH_ENABLED = os.getenv("MCP_AUTH_ENABLED", "false").lower() == "true"
+_KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://localhost:8180")
+_KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "mcp")
+_OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID", "weather-server")
+_OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET", "weather-server-secret")
+
+
+def _build_mcp() -> FastMCP:
+    """Build FastMCP instance, with native OAuth when enabled."""
+    kwargs: dict[str, Any] = dict(host=_args.host, port=_args.port)
+    if _AUTH_ENABLED:
+        from mcp_utils.oauth_middleware import KeycloakTokenVerifier
+        issuer_url = f"{_KEYCLOAK_URL}/realms/{_KEYCLOAK_REALM}"
+        resource_url = f"http://localhost:{_args.port}"
+        kwargs["auth"] = AuthSettings(
+            issuer_url=issuer_url,
+            resource_server_url=resource_url,
+        )
+        kwargs["token_verifier"] = KeycloakTokenVerifier(
+            keycloak_url=_KEYCLOAK_URL,
+            realm=_KEYCLOAK_REALM,
+            client_id=_OAUTH_CLIENT_ID,
+            client_secret=_OAUTH_CLIENT_SECRET,
+        )
+        print(f"[weather] OAuth ENABLED — issuer: {issuer_url}")
+    return FastMCP("weather", **kwargs)
+
+
+mcp = _build_mcp()
 
 # ── Constants ────────────────────────────────────────────────────────────────
 NWS_API_BASE = "https://api.weather.gov"

@@ -5,22 +5,34 @@ Connects to one or many remote MCP servers via streamable HTTP,
 discovers all available tools, and acts as a supervisor agent that
 can route user queries to the right tools across any configured server.
 
+When MCP_AUTH_ENABLED=true, performs a client_credentials OAuth2 grant
+against Keycloak and passes the Bearer token to every MCP server.
+
 Configure servers via comma-separated MCP_SERVER_URLS env var:
   MCP_SERVER_URLS=http://localhost:9002/mcp,http://localhost:9003/mcp
 """
-from google.adk.agents import LlmAgent
-from google.adk.tools.mcp_tool import MCPToolset, StreamableHTTPConnectionParams
+from __future__ import annotations
+
 import os
 
+import httpx
+from google.adk.agents import LlmAgent
+from google.adk.tools.mcp_tool import MCPToolset, StreamableHTTPConnectionParams
 
-# Comma-separated list of MCP server URLs
+
+# ── Configuration ────────────────────────────────────────────────────────────
 MCP_SERVER_URLS = os.getenv(
     "MCP_SERVER_URLS",
     os.getenv("MCP_SERVER_URL", "http://localhost:9002/mcp"),
 )
-GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "vg-pp-001")
-GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+
+# OAuth settings (optional)
+MCP_AUTH_ENABLED = os.getenv("MCP_AUTH_ENABLED", "false").lower() == "true"
+KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://localhost:8180")
+KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "mcp")
+OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID", "adk-agui-client")
+OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET", "adk-agui-secret")
 
 
 def _parse_server_urls(urls_str: str) -> list[str]:
@@ -28,20 +40,48 @@ def _parse_server_urls(urls_str: str) -> list[str]:
     return [u.strip() for u in urls_str.split(",") if u.strip()]
 
 
+def _fetch_oauth_token() -> str:
+    """Perform OAuth2 client_credentials grant against Keycloak (synchronous)."""
+    token_url = f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/token"
+    resp = httpx.post(
+        token_url,
+        data={
+            "grant_type": "client_credentials",
+            "client_id": OAUTH_CLIENT_ID,
+            "client_secret": OAUTH_CLIENT_SECRET,
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
+    token = resp.json()["access_token"]
+    print(f"[adk-agui] OAuth token acquired from {token_url}")
+    return token
+
+
 def build_agent() -> LlmAgent:
     """
     Create an ADK supervisor agent with tools auto-discovered from
     all configured MCP servers (streamable HTTP).
 
-    Each MCP server URL gets its own MCPToolset — the agent sees the
-    union of all tools and can route queries to any of them.
+    When MCP_AUTH_ENABLED=true, fetches a Bearer token from Keycloak
+    via client_credentials grant and injects it into every MCP connection.
     """
     server_urls = _parse_server_urls(MCP_SERVER_URLS)
+
+    # Build auth headers if OAuth is enabled
+    headers: dict[str, str] | None = None
+    if MCP_AUTH_ENABLED:
+        token = _fetch_oauth_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        print("[adk-agui] OAuth enabled — Bearer token will be sent to all MCP servers")
 
     # Create one MCPToolset per server
     mcp_toolsets = [
         MCPToolset(
-            connection_params=StreamableHTTPConnectionParams(url=url),
+            connection_params=StreamableHTTPConnectionParams(
+                url=url,
+                headers=headers,
+            ),
         )
         for url in server_urls
     ]

@@ -1,10 +1,16 @@
-"""AG-UI FastAPI application — streams ADK agent responses over SSE."""
+"""AG-UI FastAPI application — serves chat UI and streams ADK agent responses."""
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from src.agent.agent import build_agent
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 def build_agui_app() -> FastAPI:
@@ -20,6 +26,10 @@ def build_agui_app() -> FastAPI:
     agent = build_agent()
     session_service = InMemorySessionService()
     runner = Runner(agent=agent, session_service=session_service, app_name="mcp_agui", auto_create_session=True)
+
+    @app.get("/")
+    async def index():
+        return FileResponse(STATIC_DIR / "index.html")
 
     @app.get("/health")
     async def health():
