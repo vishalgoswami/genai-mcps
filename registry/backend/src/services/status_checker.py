@@ -4,8 +4,10 @@ Probes each server using the MCP JSON-RPC protocol:
   1. POST initialize → get session ID
   2. POST tools/list  → count tools
 
-For servers with auth_type=oauth, a Bearer token is obtained from
-Keycloak via client_credentials grant before probing.
+Auth handling per server:
+  - auth_type=none  → no auth headers
+  - auth_type=oauth → client_credentials access_token from Keycloak
+  - auth_type=oidc  → password grant id_token from Keycloak
 """
 from __future__ import annotations
 
@@ -27,6 +29,8 @@ KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://localhost:8180")
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "mcp")
 REGISTRY_OAUTH_CLIENT_ID = os.getenv("REGISTRY_OAUTH_CLIENT_ID", "mcp-registry")
 REGISTRY_OAUTH_CLIENT_SECRET = os.getenv("REGISTRY_OAUTH_CLIENT_SECRET", "registry-secret")
+OIDC_USERNAME = os.getenv("OIDC_USERNAME", "testuser")
+OIDC_PASSWORD = os.getenv("OIDC_PASSWORD", "testpass")
 
 _MCP_INIT_BODY = {
     "jsonrpc": "2.0",
@@ -62,6 +66,27 @@ async def _fetch_oauth_token() -> str:
         )
         resp.raise_for_status()
         return resp.json()["access_token"]
+
+
+async def _fetch_oidc_id_token() -> str:
+    """Obtain an OIDC id_token from Keycloak via password grant."""
+    token_url = (
+        f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/token"
+    )
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            token_url,
+            data={
+                "grant_type": "password",
+                "client_id": REGISTRY_OAUTH_CLIENT_ID,
+                "client_secret": REGISTRY_OAUTH_CLIENT_SECRET,
+                "username": OIDC_USERNAME,
+                "password": OIDC_PASSWORD,
+                "scope": "openid",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["id_token"]
 
 
 async def _check_all():
@@ -102,9 +127,12 @@ async def _probe(url: str, auth_type: str = "none") -> tuple[str, int]:
             "Accept": "application/json, text/event-stream",
         }
 
-        # Get OAuth token if server requires it
+        # Get auth token based on server's auth_type
         if auth_type == "oauth":
             token = await _fetch_oauth_token()
+            headers["Authorization"] = f"Bearer {token}"
+        elif auth_type == "oidc":
+            token = await _fetch_oidc_id_token()
             headers["Authorization"] = f"Bearer {token}"
 
         async with httpx.AsyncClient(timeout=10) as client:

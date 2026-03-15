@@ -1,169 +1,246 @@
-# MCP Hub — Model Context Protocol Monorepo
+<p align="center">
+  <a href="https://modelcontextprotocol.io">
+    <img src="https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/refs/heads/main/docs/specification/assets/images/mcp-cover.png" alt="Model Context Protocol" width="700" />
+  </a>
+</p>
 
-A production-ready monorepo for **MCP servers**, **agentic clients**, a **gateway**, and a **web registry** — all wired together with optional **Keycloak OAuth2** security.
+<p align="center">
+  <a href="https://modelcontextprotocol.io/specification/2025-03-26">
+    <img src="https://img.shields.io/badge/MCP-2025--03--26-blue?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQyIDAtOC0zLjU4LTgtOHMzLjU4LTggOC04IDggMy41OCA4IDgtMy41OCA4LTggOHoiLz48L3N2Zz4=" alt="MCP spec" />
+  </a>
+  <a href="https://www.python.org/downloads/">
+    <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python" />
+  </a>
+  <a href="https://www.docker.com/">
+    <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker" />
+  </a>
+  <a href="https://cloud.google.com/vertex-ai">
+    <img src="https://img.shields.io/badge/Gemini-Vertex_AI-4285F4?logo=google-cloud&logoColor=white" alt="Vertex AI" />
+  </a>
+  <a href="https://www.keycloak.org/">
+    <img src="https://img.shields.io/badge/Keycloak-OIDC-4D4D4D?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQyIDAtOC0zLjU4LTgtOHMzLjU4LTggOC04IDggMy41OCA4IDgtMy41OCA4LTggOHoiLz48L3N2Zz4=" alt="Keycloak" />
+  </a>
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License" />
+</p>
 
-## Architecture
+<h1 align="center">MCP Hub — Enterprise MCP Template</h1>
 
-Clients can connect to MCP servers in two ways:
-- **Via the Gateway** (port 8000) — a single aggregating reverse-proxy that unifies all MCP servers behind one endpoint
-- **Directly** to individual MCP servers — each server exposes its own streamable-HTTP endpoint
+<p align="center">
+  <strong>A production-ready monorepo demonstrating how to build, secure, and operate<br/>
+  <a href="https://modelcontextprotocol.io">Model Context Protocol</a> servers in an enterprise environment.</strong>
+</p>
 
-Both paths support optional OAuth2 Bearer tokens validated by an OIDC-compliant identity provider (Keycloak for development).
+<p align="center">
+  4 MCP servers &bull; 3 auth strategies &bull; Agentic chat client &bull; Service registry &bull; API gateway &bull; Full OAuth2/OIDC
+</p>
 
-```
-                          ┌──────────────────────────────────────────┐
-                          │              Clients                     │
-                          │                                          │
-                          │  ┌─────────────┐   ┌─────────────────┐  │
-                          │  │  ADK+AGUI   │   │   LangGraph     │  │
-                          │  │ (port 8001) │   │  (port 8002)    │  │
-                          │  └──────┬──────┘   └───────┬─────────┘  │
-                          │         │                  │            │
-                          │         │   ┌──────────┐   │            │
-                          │         │   │   CLI    │   │            │
-                          │         │   │ (REPL)   │   │            │
-                          │         │   └────┬─────┘   │            │
-                          └─────────┼────────┼─────────┼────────────┘
-                                    │        │         │
-                Bearer tokens       │        │         │
-                (OAuth)             │        │         │
-                                    │        │         │
-              ┌─────────────────────┼────────┼─────────┼──┐
-              │  Path A: Gateway    │        │         │  │
-              │  (single endpoint)  ▼        ▼         ▼  │
-              │            ┌────────────────────────────┐  │
-              │            │        Gateway             │  │
-              │            │      (port 8000)           │  │
-              │            └────────────┬───────────────┘  │
-              │                         │                  │
-              └─────────────────────────┼──────────────────┘
-                                        │
-              ┌─────────── Path B: Direct connections ─────────────┐
-              │  (clients connect to each server individually)      │
-              │                         │                           │
-              │       ┌─────────────────┼─────────────────┐        │
-              │       ▼                 ▼                  ▼        │
-              │ ┌───────────┐   ┌───────────┐   ┌─────────────────┐│
-              │ │  Weather   │   │  Stock    │   │  Your Server    ││
-              │ │ MCP Server │   │MCP Server │   │   (plug in!)    ││
-              │ │ port 9002  │   │ port 9003 │   │   port 900x     ││
-              │ └───────────┘   └───────────┘   └─────────────────┘│
-              └────────────────────────────────────────────────────┘
-                                        │
-                         ┌──────────────┼──────────────┐
-                         ▼                             ▼
-               ┌──────────────────┐          ┌─────────────────┐
-               │    Keycloak      │          │   MCP Registry   │
-               │   OIDC Provider  │          │ Backend + React  │
-               │   (port 8180)    │          │  (8080 / 3000)   │
-               └──────────────────┘          └─────────────────┘
-```
+---
 
-**Path A — Gateway**: Clients send all MCP requests to `http://gateway:8000/mcp`. The gateway routes to the correct backend server based on the tool being invoked. This simplifies client config (one URL) and centralizes auth, rate-limiting, and observability.
+## What is this?
 
-**Path B — Direct**: Clients connect to each MCP server individually (e.g., `http://localhost:9002/mcp`, `http://localhost:9003/mcp`). This is simpler for local development and gives per-server auth control. The ADK client uses this mode with `MCP_SERVERS` JSON config.
+This is a **template project** that shows you how to set up MCP servers the way they'd run at a real company — with identity providers, multiple auth strategies, a service registry, and an API gateway — all running locally with Docker.
 
-### Component Overview
+**MCP (Model Context Protocol)** is the open standard for connecting AI models to external tools and data. Think of it as "USB-C for AI" — a single protocol that lets any LLM call any tool. This repo shows you how to go from a toy MCP server running on `stdio` to a fleet of secured, discoverable MCP services that an enterprise platform team would actually deploy.
 
-| Component | Port | Tech | Description |
-|---|---|---|---|
-| **Weather Server** | 9002 | FastMCP | US weather alerts & forecasts (NWS API) |
-| **Stock Server** | 9003 | FastMCP | Stock prices, history, company info |
-| **Gateway** | 8000 | FastAPI | Aggregating reverse-proxy for all MCP servers |
-| **ADK+AGUI Client** | 8001 | Google ADK + FastAPI | Chat UI with Gemini — calls MCP tools |
-| **LangGraph Client** | 8002 | LangGraph + FastAPI | LangGraph-based conversational agent |
-| **CLI Client** | — | Python | Interactive terminal REPL for MCP |
-| **Registry Backend** | 8080 | FastAPI + SQLite | MCP server catalog API |
-| **Registry Frontend** | 3000 | React + Vite | Web UI for browsing MCP servers |
-| **Keycloak** | 8180 | Keycloak 25 | OAuth2/OIDC identity provider |
+### Why this template?
 
-### Data Flow
+Most MCP examples show a single server with `stdio` transport and no security. That's fine for a demo, but in the real world:
 
-1. **Client** sends chat message → ADK agent (Gemini) decides which MCP tool to call
-2. **Client** fetches OAuth Bearer token from Keycloak (if auth enabled for that server)
-3. **Client** calls MCP server via streamable-HTTP with `Authorization: Bearer <token>`
-4. **MCP Server** introspects token with Keycloak → validates → executes tool → returns result
-5. **Agent** formats and presents the result to the user
+- MCP servers live on **cloud infrastructure** (GKE, Cloud Run, ECS) — not your laptop
+- They need **authentication** — you can't expose corporate tools to the internet without tokens
+- Different servers need **different auth strategies** — some are public, some use machine tokens, some need user identity
+- Teams need a **registry** to discover what MCP servers exist and what tools they offer
+- A **gateway** simplifies client config and adds observability, rate-limiting, and routing
 
-### OAuth Architecture
+This template wires all of that together so you can learn the patterns, then adapt them to your own platform.
+
+### What you get
+
+| Component | What it does |
+|-----------|-------------|
+| **4 MCP Servers** | Weather, stock, calculator, greeting — each with a different auth model |
+| **ADK Chat Client** | Google Gemini-powered chat that auto-discovers and calls tools across all servers |
+| **API Gateway** | Single endpoint that aggregates all servers behind one URL |
+| **Service Registry** | Web UI + API that catalogs servers, probes their health, and counts their tools |
+| **Keycloak IdP** | Local OIDC identity provider with pre-configured clients, users, and realms |
+| **Docker Compose** | One command to start the entire stack |
+
+---
+
+## Architecture Overview
+
+### High-Level Data Flow
 
 ```
-Client (adk-agui)                 Keycloak                MCP Server
-      │                              │                         │
-      │─── client_credentials ──────►│                         │
-      │◄── access_token ────────────│                         │
-      │                              │                         │
-      │─── POST /mcp ───────────────┼────────────────────────►│
-      │    Authorization: Bearer T   │                         │
-      │                              │◄── introspect(T) ──────│
-      │                              │─── active: true ───────►│
-      │◄── MCP response ────────────┼────────────────────────│
+   User
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────┐
+│  ADK + AGUI Chat Client (port 8001)                         │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Gemini 2.5 Flash  (Vertex AI)                        │  │
+│  │  "Which tool should I call for this user question?"   │  │
+│  └───────────┬───────────────────────────────────────────┘  │
+│              │ decides tool + args                           │
+│              ▼                                               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  MCP Toolsets (one per server)                        │  │
+│  │  Adds auth headers per server config                  │  │
+│  └──┬──────────┬──────────────┬──────────────┬──────────┘  │
+│     │          │              │              │              │
+└─────┼──────────┼──────────────┼──────────────┼──────────────┘
+      │          │              │              │
+      ▼          ▼              ▼              ▼
+  ┌────────┐ ┌────────┐  ┌──────────┐  ┌──────────┐
+  │Weather │ │ Stock  │  │Calculator│  │Greeting  │
+  │ :9002  │ │ :9003  │  │  :9004   │  │  :9005   │
+  │🔒 OAuth│ │🔒 OAuth│  │🔓 Open   │  │🔑 OIDC   │
+  └───┬────┘ └───┬────┘  └──────────┘  └────┬─────┘
+      │          │                           │
+      ▼          ▼                           ▼
+  ┌──────────────────┐               ┌──────────────┐
+  │  Keycloak :8180  │◄──────────────│ JWT Verify   │
+  │  Token Introspect│               │ via JWKS     │
+  └──────────────────┘               └──────────────┘
 ```
 
-### Why Keycloak? (and using a different IdP in production)
+### Three Auth Strategies — Side by Side
 
-This project uses **Keycloak** as the OIDC identity provider for development and testing. Keycloak was chosen because:
+This template demonstrates three authentication models you'll encounter in enterprise MCP deployments:
 
-- **Self-contained** — runs as a single Docker container with zero external dependencies, making the development environment fully offline-capable
-- **Standards-compliant** — fully implements OAuth 2.0, OpenID Connect, and RFC 7662 token introspection, which the MCP SDK's auth chain relies on
-- **Realm export/import** — the entire auth config (clients, roles, users) is captured in `infra/keycloak/realm-export.json` and auto-imported on startup, so every developer gets an identical setup with zero manual configuration
-- **Multiple grant types** — supports `client_credentials` (service-to-service), `authorization_code` (interactive), and `password` (testing) out of the box
-
-**In a production environment**, you would typically replace Keycloak with your organization's existing identity provider. The MCP auth integration is designed to work with **any OIDC-compliant IdP** — the only requirement is a standard token introspection endpoint (RFC 7662). Common production alternatives include:
-
-| IdP | Notes |
-|---|---|
-| **Auth0** | Managed OIDC with built-in introspection |
-| **Okta** | Enterprise SSO; introspection via `/oauth2/v1/introspect` |
-| **Azure AD (Entra ID)** | Microsoft ecosystem; use `/oauth2/v2.0/introspect` |
-| **Google Cloud Identity** | If already using GCP for Vertex AI |
-| **AWS Cognito** | If hosting MCP servers on AWS |
-| **PingIdentity / ForgeRock** | Enterprise on-prem alternatives |
-
-To swap IdPs, update these environment variables on each MCP server:
-
-```dotenv
-KEYCLOAK_URL=https://your-idp.example.com   # base URL of the OIDC provider
-KEYCLOAK_REALM=your-realm                    # realm or tenant (IdP-specific)
-OAUTH_CLIENT_ID=my-server                    # confidential client for introspection
-OAUTH_CLIENT_SECRET=...                      # client secret for introspection
-```
-
-The `KeycloakTokenVerifier` in `shared/mcp_utils/oauth_middleware.py` discovers the introspection endpoint automatically via the OIDC discovery document (`/.well-known/openid-configuration`), so it works with any compliant provider despite the "Keycloak" name.
-
-## Repository Structure
+| Server | Auth | How it works | When to use |
+|--------|------|-------------|-------------|
+| **Calculator** (:9004) | `none` | No authentication. Anyone can call it. | Public tools, internal-only networks, dev/test |
+| **Weather** (:9002) | `oauth` | Client sends an **access_token** from `client_credentials` grant. Server **introspects** it with Keycloak (RFC 7662). | Machine-to-machine. No user context needed. |
+| **Stock** (:9003) | `oauth` | Same as weather. | Machine-to-machine. |
+| **Greeting** (:9005) | `oidc` | Client sends an **id_token** from `password` grant (or `authorization_code`). Server **verifies the JWT** signature via Keycloak's JWKS endpoint. | User-identity-aware tools. Know *who* is calling. |
 
 ```
-mcps/
-├── servers/              # MCP server implementations
-│   ├── weather/          # Weather alerts & forecasts (port 9002)
-│   ├── stock/            # Stock market data (port 9003)
-│   └── Dockerfile.template
-├── gateway/              # Aggregating MCP gateway (port 8000)
-├── clients/
-│   ├── adk-agui/         # Google ADK + AG-UI chat client (port 8001)
-│   ├── cli/              # Terminal REPL client
-│   └── langgraph/        # LangGraph agent client (port 8002)
-├── registry/
-│   ├── backend/          # FastAPI registry API (port 8080)
-│   └── frontend/         # React registry UI (port 3000)
-├── shared/               # Shared Python lib (mcp_utils) — OAuth, base classes
-├── infra/
-│   ├── keycloak/         # Keycloak realm config (auto-imported)
-│   └── credentials.yaml  # Centralized OAuth credentials template
-├── docker-compose.yml    # Full stack orchestration
-└── .env.example          # Environment template
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     Auth Strategy Comparison                            │
+├─────────────────────┬──────────────────────┬────────────────────────────┤
+│   No Auth           │  OAuth (introspect)  │  OIDC (JWT/JWKS)          │
+│                     │                      │                            │
+│  Client ──► Server  │  Client ──► Keycloak │  Client ──► Keycloak      │
+│  (no headers)       │    get access_token  │    get id_token            │
+│                     │       │              │    (password / auth_code)  │
+│                     │       ▼              │       │                    │
+│                     │  Client ──► Server   │       ▼                   │
+│                     │  Bearer: access_token│  Client ──► Server        │
+│                     │       │              │  Bearer: id_token          │
+│                     │       ▼              │       │                    │
+│                     │  Server ──► Keycloak │       ▼                   │
+│                     │  introspect token    │  Server verifies JWT      │
+│                     │  (is it valid?)      │  locally via JWKS keys    │
+│                     │                      │  (no Keycloak call)       │
+└─────────────────────┴──────────────────────┴────────────────────────────┘
 ```
 
-## Local Development Setup (macOS)
+### Dual Connectivity — Gateway vs. Direct
+
+Clients can reach MCP servers in two ways:
+
+```
+                          ┌──────────────────────────────────────────────┐
+                          │              Clients                         │
+                          │  ┌─────────────┐  ┌───────────┐  ┌───────┐ │
+                          │  │  ADK+AGUI   │  │ LangGraph │  │  CLI  │ │
+                          │  │  :8001      │  │  :8002    │  │ REPL  │ │
+                          │  └──────┬──────┘  └─────┬─────┘  └───┬───┘ │
+                          └─────────┼───────────────┼─────────────┼─────┘
+                                    │               │             │
+             ┌──────────────────────┼───────────────┼─────────────┼────┐
+             │  Path A: Gateway     │               │             │    │
+             │  (single endpoint)   ▼               ▼             ▼    │
+             │             ┌──────────────────────────────────────────┐ │
+             │             │        Gateway (port 8000)              │ │
+             │             │  Routes to correct server by tool name  │ │
+             │             └────────────────────┬────────────────────┘ │
+             └──────────────────────────────────┼──────────────────────┘
+                                                │
+             ┌──── Path B: Direct connections ──┼──────────────────────┐
+             │                                  │                      │
+             │    ┌─────────┬─────────┬─────────┬──────────┐          │
+             │    ▼         ▼         ▼         ▼          │          │
+             │ ┌───────┐ ┌───────┐ ┌────────┐ ┌────────┐  │          │
+             │ │Weather│ │ Stock │ │  Calc  │ │Greeting│  │          │
+             │ │ :9002 │ │ :9003 │ │ :9004  │ │ :9005  │  │          │
+             │ │🔒oauth│ │🔒oauth│ │🔓 open │ │🔑 oidc │  │          │
+             │ └───────┘ └───────┘ └────────┘ └────────┘  │          │
+             └─────────────────────────────────────────────┘          │
+                                                                      │
+                    ┌────────────────┐    ┌──────────────────────┐    │
+                    │ Keycloak :8180 │    │  MCP Registry        │    │
+                    │ OIDC Provider  │    │  Backend :8080       │    │
+                    │ (dev IdP)      │    │  Frontend :3000      │    │
+                    └────────────────┘    └──────────────────────┘    │
+```
+
+- **Path A — Gateway**: One URL for everything. The gateway discovers tools from all servers and routes requests. Best for production — centralizes auth, rate-limiting, and observability.
+- **Path B — Direct**: Each server is called individually. Best for local development and per-server auth control. The ADK client uses this mode.
+
+### Service Registry Data Flow
+
+```
+┌──────────────┐    ┌──────────────────────────────────────────────┐
+│  Registry    │    │           Status Checker (every 60s)         │
+│  Frontend    │    │                                              │
+│  React :3000 │    │  For each registered server:                 │
+│              │    │    1. Get auth token (oauth/oidc/none)       │
+│   GET /api/  │    │    2. POST /mcp → initialize (JSON-RPC)     │
+│   servers    │    │    3. POST /mcp → tools/list (JSON-RPC)     │
+│              │    │    4. Parse SSE response → count tools       │
+│      │       │    │    5. Update status + tools_count in DB      │
+│      ▼       │    └──────────────────────────────────────────────┘
+│  ┌────────┐  │                         │
+│  │ Server │  │    ┌────────────────────┘
+│  │ Cards  │  │    │
+│  │ with   │◄─┼────┘
+│  │ status │  │
+│  └────────┘  │
+└──────────────┘
+```
+
+---
+
+## Quick Start (5 minutes)
+
+> **Prerequisites**: Docker Desktop, Python 3.11+, Google Cloud CLI (`gcloud`)
+
+```bash
+# 1. Clone
+git clone https://github.com/vishalgoswami/genai-mcps.git && cd mcps
+
+# 2. Configure
+cp .env.example .env
+# Edit .env → set GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+
+# 3. Authenticate with GCP (for Gemini / Vertex AI)
+gcloud auth application-default login
+
+# 4. Start the full stack
+docker compose up -d
+
+# 5. Open the chat UI
+open http://localhost:8001
+```
+
+That's it. You now have 4 MCP servers, Keycloak, a registry, and a Gemini-powered chat client running locally.
+
+---
+
+## Detailed Setup Guide
 
 ### Prerequisites
 
-- **Python 3.11+** — `brew install python@3.13`
-- **Docker Desktop** — [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
-- **Google Cloud CLI** — `brew install google-cloud-sdk` (for Vertex AI / Gemini)
+| Tool | Install | What for |
+|------|---------|----------|
+| **Python 3.11+** | `brew install python@3.13` | MCP servers, clients |
+| **Docker Desktop** | [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) | Container orchestration |
+| **Google Cloud CLI** | `brew install google-cloud-sdk` | Vertex AI / Gemini auth |
+| **Node.js 20+** | `brew install node` | Registry frontend (dev only) |
 
-### Step 1 — Clone & configure environment
+### Step 1 — Clone and configure
 
 ```bash
 git clone https://github.com/vishalgoswami/genai-mcps.git
@@ -171,103 +248,133 @@ cd mcps
 cp .env.example .env
 ```
 
-Edit `.env` and set your Google Cloud project:
+Edit `.env`:
 
 ```dotenv
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=us-central1
-MCP_AUTH_ENABLED=true        # set to "false" to skip OAuth entirely
+GOOGLE_GENAI_USE_VERTEXAI=true
+MCP_AUTH_ENABLED=true    # "false" to skip OAuth entirely
 ```
 
-### Step 2 — Authenticate with Google Cloud (for Gemini / Vertex AI)
+### Step 2 — Authenticate with Google Cloud
+
+The ADK chat client uses **Gemini** on Vertex AI via Application Default Credentials (ADC). No API keys — just:
 
 ```bash
 gcloud auth application-default login
-# Verify:
-gcloud auth application-default print-access-token
+gcloud auth application-default print-access-token  # verify
 ```
 
-### Step 3 — Start Keycloak (OAuth provider)
+### Step 3 — Start the identity provider (Keycloak)
+
+Keycloak provides the local OAuth2/OIDC infrastructure. In production you'd use your corporate IdP — here it simulates that role.
 
 ```bash
-# Start Docker Desktop first, then:
 docker compose up keycloak -d
-
-# Wait for healthy status (~30–45 seconds):
-docker ps --format "table {{.Names}}\t{{.Status}}"
-# → mcps-keycloak-1   Up 45 seconds (healthy)
 ```
 
-Keycloak auto-imports the `mcp` realm with pre-configured clients:
+Wait for healthy status (~30–45 seconds):
 
-| Client | Secret | Purpose |
-|---|---|---|
-| `weather-server` | `weather-server-secret` | Weather MCP server (confidential) |
-| `stock-server` | `stock-server-secret` | Stock MCP server (confidential) |
-| `adk-agui-client` | `adk-agui-secret` | ADK chat client (service account) |
+```bash
+docker inspect --format '{{.State.Health.Status}}' mcps-keycloak-1
+# → healthy
+```
+
+**What gets auto-configured**: The `mcp` realm, pre-loaded from `infra/keycloak/realm-export.json`, includes:
+
+| Keycloak Client | Secret | Purpose |
+|-----------------|--------|---------|
+| `weather-server` | `weather-server-secret` | Weather MCP server (introspection) |
+| `stock-server` | `stock-server-secret` | Stock MCP server (introspection) |
+| `greeting-server` | `greeting-server-secret` | Greeting MCP server (JWKS) |
+| `adk-agui-client` | `adk-agui-secret` | ADK chat client (gets tokens) |
 | `mcp-gateway` | `gateway-secret` | Gateway (confidential) |
+| `mcp-registry` | `registry-secret` | Registry status checker |
+
+Test user: `testuser` / `testpass` (for OIDC password grant flows)
 
 Admin console: http://localhost:8180 — login `admin` / `admin`
 
+> **Why Keycloak?** It's self-contained (single Docker container), fully OIDC-compliant, and supports realm export/import so every developer gets identical config with zero manual setup. See [Swapping Identity Providers](#swapping-identity-providers-for-production) for production alternatives.
+
 ### Step 4 — Start MCP servers
 
-**Option A: Docker (recommended)**
-
 ```bash
-docker compose up weather-server stock-server -d
-
-# Verify all healthy:
-docker ps --format "table {{.Names}}\t{{.Status}}"
+# All 4 servers + Keycloak (if not already running)
+docker compose up weather-server stock-server calculator-server greeting-server -d
 ```
 
-**Option B: Local Python (for development)**
+Verify they're running:
 
 ```bash
-# Weather server
+docker ps --format "table {{.Names}}\t{{.Ports}}\t{{.Status}}"
+```
+
+**Or run locally** (for development with hot reload):
+
+```bash
+# Calculator (no auth, no shared lib needed)
+cd servers/calculator
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
+calculator-server --transport streamable-http --port 9004
+
+# Weather (OAuth — needs shared lib)
 cd servers/weather
 python -m venv .venv && source .venv/bin/activate
 pip install -e . -e ../../shared/
-MCP_AUTH_ENABLED=true \
-OAUTH_CLIENT_ID=weather-server \
-OAUTH_CLIENT_SECRET=weather-server-secret \
-weather-server --transport streamable-http --port 9002
-
-# Stock server (in another terminal)
-cd servers/stock
-python -m venv .venv && source .venv/bin/activate
-pip install -e . -e ../../shared/
-MCP_AUTH_ENABLED=true \
-OAUTH_CLIENT_ID=stock-server \
-OAUTH_CLIENT_SECRET=stock-server-secret \
-stock-server --transport streamable-http --port 9003
+MCP_AUTH_ENABLED=true KEYCLOAK_URL=http://localhost:8180 KEYCLOAK_REALM=mcp \
+  OAUTH_CLIENT_ID=weather-server OAUTH_CLIENT_SECRET=weather-server-secret \
+  weather-server --transport streamable-http --port 9002
 ```
 
 ### Step 5 — Verify OAuth is working
 
 ```bash
-# Get a token:
+# Get an access_token (client_credentials grant):
 TOKEN=$(curl -s -X POST http://localhost:8180/realms/mcp/protocol/openid-connect/token \
   -d grant_type=client_credentials \
   -d client_id=adk-agui-client \
   -d client_secret=adk-agui-secret | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 # Without token → 401:
-curl -s -X POST http://localhost:9002/mcp \
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:9002/mcp \
   -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
-# → {"error": "invalid_token", "error_description": "Authentication required"}
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+# → 401
 
 # With token → 200:
 curl -s -X POST http://localhost:9002/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
 # → {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26",...}}
 ```
 
-### Step 6 — Start the ADK+AGUI chat client
+**Test OIDC id_token flow** (for the greeting server):
+
+```bash
+# Get an id_token (password grant with openid scope):
+ID_TOKEN=$(curl -s -X POST http://localhost:8180/realms/mcp/protocol/openid-connect/token \
+  -d grant_type=password \
+  -d client_id=adk-agui-client \
+  -d client_secret=adk-agui-secret \
+  -d username=testuser \
+  -d password=testpass \
+  -d scope=openid | python3 -c "import sys,json; print(json.load(sys.stdin)['id_token'])")
+
+# Call greeting server with id_token:
+curl -s -X POST http://localhost:9005/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Authorization: Bearer $ID_TOKEN" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+# → {"jsonrpc":"2.0","id":1,"result":{...,"serverInfo":{"name":"greeting",...}}}
+```
+
+### Step 6 — Start the ADK chat client
 
 ```bash
 cd clients/adk-agui
@@ -283,35 +390,340 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=true
 LLM_MODEL=gemini-2.5-flash
 
-# Per-server auth config (recommended):
-MCP_SERVERS=[{"url":"http://localhost:9002/mcp","auth":true},{"url":"http://localhost:9003/mcp","auth":true}]
+# Per-server auth — mix all three strategies:
+MCP_SERVERS=[
+  {"url":"http://localhost:9002/mcp","auth":"oauth"},
+  {"url":"http://localhost:9003/mcp","auth":"oauth"},
+  {"url":"http://localhost:9004/mcp"},
+  {"url":"http://localhost:9005/mcp","auth":"oidc"}
+]
 
 KEYCLOAK_URL=http://localhost:8180
 KEYCLOAK_REALM=mcp
 OAUTH_CLIENT_ID=adk-agui-client
 OAUTH_CLIENT_SECRET=adk-agui-secret
+OIDC_USERNAME=testuser
+OIDC_PASSWORD=testpass
 ```
 
 ```bash
 adk-agui
+# → [adk-agui]   🔒 oauth  http://localhost:9002/mcp
+# → [adk-agui]   🔒 oauth  http://localhost:9003/mcp
+# → [adk-agui]   🔓 public http://localhost:9004/mcp
+# → [adk-agui]   🔑 oidc   http://localhost:9005/mcp
 # → Uvicorn running on http://0.0.0.0:8001
 ```
 
-Open http://localhost:8001 in your browser to use the chat UI.
+Open http://localhost:8001 — try asking:
+- *"What's the weather in California?"*
+- *"How is AAPL doing?"*
+- *"What is 42 factorial?"*
+- *"Say hello in Japanese"*
 
-### Step 7 — Full Docker Stack (optional)
+### Step 7 — Start the registry and gateway
+
+```bash
+docker compose up registry-backend registry-frontend gateway -d
+```
+
+- **Registry UI**: http://localhost:3000 — browse all MCP servers, their status, and tool counts
+- **Registry API**: http://localhost:8080/api/servers/
+- **Gateway**: http://localhost:8000/mcp — single aggregated MCP endpoint
+
+### Full stack (one command)
 
 ```bash
 docker compose up -d
-# Starts: Keycloak, Weather, Stock, Gateway, Registry
+# Starts everything: Keycloak, 4 MCP servers, gateway, registry backend + frontend
 ```
+
+---
+
+## Components in Detail
+
+### MCP Servers
+
+| Server | Port | Auth | Tools | Description |
+|--------|------|------|-------|-------------|
+| **Weather** | 9002 | 🔒 OAuth (introspect) | `get_alerts`, `get_forecast` | US weather data from NWS API |
+| **Stock** | 9003 | 🔒 OAuth (introspect) | `get_stock_price`, `get_stock_history`, `get_company_info` | Market data via yfinance |
+| **Calculator** | 9004 | 🔓 None | `add`, `multiply`, `factorial` | Basic math — intentionally open |
+| **Greeting** | 9005 | 🔑 OIDC (JWT/JWKS) | `greet`, `farewell` | Multi-language greetings — needs user identity |
+
+All servers use **FastMCP** (`mcp.server.fastmcp.FastMCP`) with streamable-HTTP transport. Each supports three transports via `--transport`: `stdio` (local dev), `sse`, `streamable-http` (Docker/cloud).
+
+### ADK Chat Client
+
+The chat client uses **Google ADK** (Agent Development Kit) with **Gemini 2.5 Flash** on Vertex AI as the LLM. It:
+
+1. Connects to all configured MCP servers via streamable-HTTP
+2. Auto-discovers available tools from each server
+3. Uses Gemini to route user questions to the appropriate tool(s)
+4. Handles auth per-server: no-auth, `client_credentials`, or OIDC `password` grant
+
+**Client auth config** (`MCP_SERVERS` JSON array):
+
+```jsonc
+[
+  {"url": "http://localhost:9002/mcp", "auth": "oauth"},  // client_credentials → access_token
+  {"url": "http://localhost:9003/mcp", "auth": "oauth"},  // client_credentials → access_token
+  {"url": "http://localhost:9004/mcp"},                    // no auth
+  {"url": "http://localhost:9005/mcp", "auth": "oidc"}    // password grant → id_token
+]
+```
+
+### API Gateway
+
+Aggregating reverse-proxy that unifies all MCP servers behind `http://gateway:8000/mcp`. Configured via `gateway/config/servers.yaml`.
+
+### Service Registry
+
+- **Backend** (FastAPI + SQLite): Stores server metadata, runs a background status checker every 60s that probes each server using MCP JSON-RPC protocol with the appropriate auth
+- **Frontend** (React + Vite + Tailwind): Cards showing server name, status, tool count, auth type
+
+### Keycloak (Local IdP)
+
+A fully configured Keycloak instance that auto-imports the `mcp` realm on startup. Provides:
+
+- OAuth2 token endpoint for `client_credentials` and `password` grants
+- Token introspection endpoint (RFC 7662) for access token validation
+- JWKS endpoint for JWT signature verification (OIDC id_tokens)
+- Pre-configured clients for every component in the stack
+
+---
+
+## Keycloak Local IdP Setup
+
+This section explains how the local Keycloak identity provider is configured and how to customize it.
+
+### Realm Configuration
+
+All auth configuration lives in `infra/keycloak/realm-export.json`. This file is auto-imported when the Keycloak container starts via the `--import-realm` flag.
+
+The realm named `mcp` contains:
+
+**Clients** (9 pre-configured):
+
+| Client ID | Type | Service Account | Purpose |
+|-----------|------|----------------|---------|
+| `weather-server` | Confidential | Yes | Weather server introspection |
+| `stock-server` | Confidential | Yes | Stock server introspection |
+| `greeting-server` | Confidential | No | Greeting server (JWKS only) |
+| `adk-agui-client` | Confidential | Yes | ADK chat client |
+| `mcp-gateway` | Confidential | Yes | Gateway |
+| `mcp-registry` | Confidential | Yes | Registry status checker |
+| `cli-client` | Confidential | Yes | CLI REPL client |
+| `langgraph-client` | Confidential | Yes | LangGraph client |
+| `mcp-client` | Public | N/A | Browser-based clients |
+
+**Users**:
+
+| Username | Password | Purpose |
+|----------|----------|---------|
+| `testuser` | `testpass` | OIDC password grant for id_token flows |
+| `admin` | `admin` | Keycloak admin console |
+
+**Scopes**: `openid`, `profile`, `email` — assigned to all clients by default.
+
+### How Docker Hostname Works
+
+Keycloak runs inside Docker as `keycloak:8080` but is accessed externally at `http://localhost:8180`. This dual-identity is handled by:
+
+```yaml
+command: start-dev --import-realm --hostname http://localhost:8180 --hostname-backchannel-dynamic true
+```
+
+- `--hostname http://localhost:8180` — tokens contain `iss: http://localhost:8180/realms/mcp`
+- `--hostname-backchannel-dynamic true` — allows internal services (reaching Keycloak as `keycloak:8080`) to validate tokens with the `localhost:8180` issuer claim
+
+Without `--hostname-backchannel-dynamic true`, token introspection from inside Docker returns `active: false` because the issuer URL doesn't match.
+
+### Adding a New Keycloak Client
+
+**Option A — Realm export file** (recommended for reproducibility):
+
+Add to the `clients` array in `infra/keycloak/realm-export.json`:
+
+```json
+{
+  "clientId": "my-new-server",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "publicClient": false,
+  "secret": "my-server-secret",
+  "directAccessGrantsEnabled": true,
+  "serviceAccountsEnabled": true,
+  "standardFlowEnabled": true,
+  "redirectUris": ["http://localhost:*"],
+  "webOrigins": ["*"],
+  "defaultClientScopes": ["openid", "profile", "email"]
+}
+```
+
+Then restart Keycloak: `docker compose up keycloak -d --force-recreate`
+
+**Option B — Admin UI** (for quick testing):
+
+1. Open http://localhost:8180 → `admin` / `admin`
+2. Select `mcp` realm → Clients → Create client
+3. Client ID: `my-new-server`, Client authentication: ON
+4. Credentials tab → copy the generated secret
+
+### Token Flows Reference
+
+**Client Credentials (for OAuth servers)**:
+
+```bash
+curl -X POST http://localhost:8180/realms/mcp/protocol/openid-connect/token \
+  -d grant_type=client_credentials \
+  -d client_id=adk-agui-client \
+  -d client_secret=adk-agui-secret
+# → {"access_token": "eyJ...", "token_type": "Bearer", "expires_in": 300}
+```
+
+**Password Grant with OpenID (for OIDC servers)**:
+
+```bash
+curl -X POST http://localhost:8180/realms/mcp/protocol/openid-connect/token \
+  -d grant_type=password \
+  -d client_id=adk-agui-client \
+  -d client_secret=adk-agui-secret \
+  -d username=testuser \
+  -d password=testpass \
+  -d scope=openid
+# → {"access_token": "eyJ...", "id_token": "eyJ...", "token_type": "Bearer"}
+```
+
+**Introspect a token** (what OAuth servers do internally):
+
+```bash
+curl -X POST http://localhost:8180/realms/mcp/protocol/openid-connect/token/introspect \
+  -d token=eyJ... \
+  -d client_id=weather-server \
+  -d client_secret=weather-server-secret
+# → {"active": true, "client_id": "adk-agui-client", "scope": "..."}
+```
+
+---
+
+## Swapping Identity Providers for Production
+
+Keycloak is the **development** IdP. In production, swap it for your organization's existing provider. The MCP auth layer is **IdP-agnostic** — it only requires standard OIDC endpoints.
+
+### What the MCP servers need
+
+| Auth Type | Required Endpoint | Standard |
+|-----------|------------------|----------|
+| `oauth` (introspection) | `/.well-known/openid-configuration` → `introspection_endpoint` | RFC 7662 |
+| `oidc` (JWT/JWKS) | `/.well-known/openid-configuration` → `jwks_uri` | OpenID Connect |
+
+### Compatible Identity Providers
+
+| IdP | Grant Types | Notes |
+|-----|------------|-------|
+| **Auth0** | All | Managed OIDC, built-in introspection |
+| **Okta** | All | Enterprise SSO, introspection via `/oauth2/v1/introspect` |
+| **Azure AD (Entra ID)** | `client_credentials`, `authorization_code` | Microsoft ecosystem |
+| **Google Cloud Identity** | `authorization_code`, service accounts | If already on GCP |
+| **AWS Cognito** | All | If hosting MCP servers on AWS |
+| **PingIdentity / ForgeRock** | All | Enterprise on-prem alternatives |
+
+### How to swap
+
+Update environment variables on each MCP server:
+
+```dotenv
+KEYCLOAK_URL=https://your-idp.example.com     # OIDC provider base URL
+KEYCLOAK_REALM=your-tenant                     # realm / tenant / directory
+OAUTH_CLIENT_ID=my-server                      # confidential client
+OAUTH_CLIENT_SECRET=...                        # client secret
+```
+
+The `KeycloakTokenVerifier` and `OIDCIdTokenVerifier` in `shared/mcp_utils/oauth_middleware.py` discover endpoints automatically via `/.well-known/openid-configuration`, so they work with any compliant provider despite the "Keycloak" name.
+
+---
+
+## Enterprise Deployment — Beyond Local Docker
+
+This template runs everything on `localhost` for learning. In a real enterprise, the deployment looks very different.
+
+### Production Architecture on GCP
+
+```
+                    ┌────────────────────────────────────┐
+                    │          Corporate IdP              │
+                    │  (Okta / Azure AD / Auth0)          │
+                    └────────────┬───────────────────────┘
+                                 │
+        ┌────────────────────────┼──────────────────────────────┐
+        │                   GCP Project                         │
+        │                                                       │
+        │  ┌─────────────┐   ╔══════════════════════════════╗  │
+        │  │  Cloud Run   │   ║     GKE Cluster              ║  │
+        │  │  or App      │   ║                              ║  │
+        │  │  Engine      │   ║  ┌────────┐  ┌────────┐     ║  │
+        │  │              │   ║  │Weather │  │ Stock  │     ║  │
+        │  │ ┌──────────┐ │   ║  │  Pod   │  │  Pod   │     ║  │
+        │  │ │ ADK Chat │ │   ║  └────────┘  └────────┘     ║  │
+        │  │ │ Client   │ │   ║  ┌────────┐  ┌────────┐     ║  │
+        │  │ └──────────┘ │   ║  │  Calc  │  │Greeting│     ║  │
+        │  │ ┌──────────┐ │   ║  │  Pod   │  │  Pod   │     ║  │
+        │  │ │ Registry │ │   ║  └────────┘  └────────┘     ║  │
+        │  │ │ Backend  │ │   ║                              ║  │
+        │  │ └──────────┘ │   ║  ┌──────────────────────┐    ║  │
+        │  └─────────────┘    ║  │ Gateway (Ingress)    │    ║  │
+        │                     ║  └──────────────────────┘    ║  │
+        │                     ╚══════════════════════════════╝  │
+        │                                                       │
+        │  ┌─────────────────┐   ┌──────────────────────────┐  │
+        │  │  Cloud SQL      │   │  Vertex AI (Gemini)      │  │
+        │  │  (Registry DB)  │   │  LLM for ADK agent       │  │
+        │  └─────────────────┘   └──────────────────────────┘  │
+        │                                                       │
+        │  ┌─────────────────┐   ┌──────────────────────────┐  │
+        │  │  Secret Manager │   │  Cloud CDN / LB          │  │
+        │  │  (OAuth creds)  │   │  (Registry frontend)     │  │
+        │  └─────────────────┘   └──────────────────────────┘  │
+        └───────────────────────────────────────────────────────┘
+```
+
+### What changes in production
+
+| Concern | Local (this template) | Production (GCP) |
+|---------|----------------------|-------------------|
+| **MCP Servers** | Docker containers on localhost | GKE pods or Cloud Run services |
+| **Identity Provider** | Keycloak in Docker | Corporate IdP (Okta, Azure AD, Google IAM) |
+| **Secrets** | `.env` files, realm-export.json | Google Secret Manager |
+| **Database** | SQLite file | Cloud SQL (PostgreSQL) |
+| **Client App** | Local Python process | Cloud Run or App Engine |
+| **Registry Frontend** | Nginx in Docker | Cloud CDN + Cloud Storage |
+| **Networking** | `localhost` ports | Internal VPC, Cloud Load Balancer |
+| **TLS** | None (HTTP) | Managed TLS via Google-managed certs |
+| **Discovery** | Hard-coded URLs or env vars | Service mesh (Istio/Anthos), DNS |
+| **Scaling** | Single instance | Horizontal Pod Autoscaler / Cloud Run auto-scale |
+| **Monitoring** | Docker logs | Cloud Logging, Cloud Monitoring, OpenTelemetry |
+
+### Key considerations for enterprise MCP
+
+1. **Service mesh for discovery**: Instead of hard-coded server URLs, use Kubernetes service DNS (`weather-server.mcp.svc.cluster.local`) or Istio for automatic mTLS between services.
+
+2. **Workload Identity**: Replace `OAUTH_CLIENT_SECRET` env vars with GKE Workload Identity — pods authenticate to the IdP via bound service account tokens, no secrets to manage.
+
+3. **API Gateway / Ingress**: Use Apigee, Cloud Endpoints, or an Istio ingress gateway instead of the custom FastAPI gateway. These add rate-limiting, API key management, and analytics.
+
+4. **Network policies**: MCP servers on GKE should have Kubernetes NetworkPolicies restricting which namespaces/pods can reach them.
+
+5. **Multi-tenancy**: In a platform team model, different teams own different MCP servers. The registry becomes critical for discoverability, and OAuth scopes/roles control which clients can access which servers.
+
+---
 
 ## Adding a New MCP Server
 
 ### 1. Create the server
 
 ```bash
-mkdir -p servers/my-server/src
+mkdir -p servers/my-server/src && touch servers/my-server/src/__init__.py
 ```
 
 `servers/my-server/src/server.py`:
@@ -344,7 +756,7 @@ p = argparse.ArgumentParser()
 p.add_argument("--transport", default=os.getenv("MCP_TRANSPORT", "stdio"),
                choices=["stdio", "sse", "streamable-http"])
 p.add_argument("--host", default=os.getenv("MCP_HOST", "127.0.0.1"))
-p.add_argument("--port", type=int, default=int(os.getenv("MCP_PORT", "9004")))
+p.add_argument("--port", type=int, default=int(os.getenv("MCP_PORT", "9006")))
 args = p.parse_args()
 
 mcp = _build_mcp(args.host, args.port)
@@ -361,32 +773,17 @@ if __name__ == "__main__":
     main()
 ```
 
-### 2. Register it in the client
+### 2. Add it to the client
 
-Add the server to `clients/adk-agui/.env`:
+In `clients/adk-agui/.env`, add to the `MCP_SERVERS` array:
 
-```dotenv
-# Mix auth and no-auth servers freely:
-MCP_SERVERS=[
-  {"url": "http://localhost:9002/mcp", "auth": true},
-  {"url": "http://localhost:9003/mcp", "auth": true},
-  {"url": "http://localhost:9004/mcp", "auth": false}
-]
+```json
+{"url": "http://localhost:9006/mcp", "auth": "oauth"}
 ```
-
-That's it — the ADK client auto-discovers tools from all configured servers.
 
 ### 3. (Optional) Register in Keycloak
 
-If the server requires OAuth, create a client in Keycloak:
-
-1. Open http://localhost:8180 → admin / admin
-2. Select the `mcp` realm → Clients → Create client
-3. Client ID: `my-server`, Client authentication: ON
-4. Credentials tab → copy the secret
-5. Set `OAUTH_CLIENT_ID=my-server` and `OAUTH_CLIENT_SECRET=<secret>` for the server
-
-Or add the client to `infra/keycloak/realm-export.json` for automatic import.
+Add a client entry to `infra/keycloak/realm-export.json` (see [Keycloak section](#adding-a-new-keycloak-client)).
 
 ### 4. (Optional) Add to Docker Compose
 
@@ -396,8 +793,7 @@ Or add the client to `infra/keycloak/realm-export.json` for automatic import.
       context: .
       dockerfile: servers/my-server/Dockerfile
     ports:
-      - "9004:9004"
-    env_file: .env
+      - "9006:9006"
     environment:
       MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
       KEYCLOAK_URL: http://keycloak:8080
@@ -408,60 +804,93 @@ Or add the client to `infra/keycloak/realm-export.json` for automatic import.
         condition: service_healthy
 ```
 
-## Pluggable MCP Server Configuration
+---
 
-The ADK client supports two configuration formats:
+## Repository Structure
 
-### Per-server auth (recommended)
-
-```dotenv
-MCP_SERVERS=[
-  {"url": "http://localhost:9002/mcp", "auth": true},
-  {"url": "http://localhost:9003/mcp", "auth": true},
-  {"url": "http://external-server:8080/mcp", "auth": false}
-]
+```
+mcps/
+├── servers/
+│   ├── weather/          # 🔒 OAuth — US weather alerts & forecasts (port 9002)
+│   ├── stock/            # 🔒 OAuth — Stock prices & company info (port 9003)
+│   ├── calculator/       # 🔓 Open  — Basic math operations (port 9004)
+│   ├── greeting/         # 🔑 OIDC  — Multi-language greetings (port 9005)
+│   └── Dockerfile.template
+├── gateway/              # API gateway — single MCP endpoint (port 8000)
+├── clients/
+│   ├── adk-agui/         # Google ADK + Gemini chat client (port 8001)
+│   ├── cli/              # Terminal REPL client
+│   └── langgraph/        # LangGraph agent client (port 8002)
+├── registry/
+│   ├── backend/          # FastAPI registry API (port 8080)
+│   └── frontend/         # React registry UI (port 3000)
+├── shared/               # mcp_utils — OAuth verifiers, base classes, types
+├── infra/
+│   ├── keycloak/         # Realm config (realm-export.json)
+│   └── credentials.yaml  # Credentials template (never commit real secrets)
+├── docker-compose.yml    # Full stack orchestration
+└── .env.example          # Environment template
 ```
 
-Each server independently controls whether OAuth tokens are sent. This is ideal when mixing internal (protected) and external (public) MCP servers.
+## Port Assignments
 
-### Simple mode (all-or-nothing)
+| Component | Port | Auth |
+|-----------|------|------|
+| Gateway | 8000 | — |
+| ADK+AGUI Client | 8001 | — |
+| LangGraph Client | 8002 | — |
+| Registry Backend | 8080 | — |
+| Registry Frontend | 3000 | — |
+| Keycloak | 8180 | — |
+| Weather Server | 9002 | 🔒 OAuth |
+| Stock Server | 9003 | 🔒 OAuth |
+| Calculator Server | 9004 | 🔓 None |
+| Greeting Server | 9005 | 🔑 OIDC |
 
-```dotenv
-MCP_SERVER_URLS=http://localhost:9002/mcp,http://localhost:9003/mcp
-MCP_AUTH_ENABLED=true
-```
-
-All servers share the same auth setting. Simpler, but less flexible.
-
-## Environment Variables Reference
+## Environment Variables
 
 | Variable | Default | Description |
-|---|---|---|
-| `MCP_SERVERS` | — | JSON array of server configs (per-server auth) |
-| `MCP_SERVER_URLS` | `http://localhost:9002/mcp` | Comma-separated MCP server URLs |
-| `MCP_AUTH_ENABLED` | `false` | Global OAuth toggle (for simple mode) |
+|----------|---------|-------------|
+| `MCP_SERVERS` | — | JSON array of `{url, auth}` server configs |
+| `MCP_AUTH_ENABLED` | `false` | Enable OAuth on MCP servers |
 | `KEYCLOAK_URL` | `http://localhost:8180` | Keycloak base URL |
-| `KEYCLOAK_REALM` | `mcp` | Keycloak realm name |
-| `OAUTH_CLIENT_ID` | varies per component | OAuth client ID |
-| `OAUTH_CLIENT_SECRET` | varies per component | OAuth client secret |
-| `MCP_TRANSPORT` | `stdio` (local), `streamable-http` (Docker) | MCP transport protocol |
-| `MCP_HOST` | `127.0.0.1` | Server bind host |
-| `MCP_PORT` | varies | Server bind port |
-| `LLM_MODEL` | `gemini-2.5-flash` | Gemini model for ADK agents |
-| `GOOGLE_CLOUD_PROJECT` | — | GCP project ID (for Vertex AI) |
-| `GOOGLE_GENAI_USE_VERTEXAI` | — | Set `true` for Vertex AI auth |
+| `KEYCLOAK_REALM` | `mcp` | Keycloak realm |
+| `OAUTH_CLIENT_ID` | varies | OAuth client ID |
+| `OAUTH_CLIENT_SECRET` | varies | OAuth client secret |
+| `OIDC_USERNAME` | `testuser` | User for OIDC password grant |
+| `OIDC_PASSWORD` | `testpass` | Password for OIDC password grant |
+| `MCP_TRANSPORT` | `stdio` / `streamable-http` | MCP transport protocol |
+| `LLM_MODEL` | `gemini-2.5-flash` | Gemini model for ADK agent |
+| `GOOGLE_CLOUD_PROJECT` | — | GCP project ID |
+| `GOOGLE_GENAI_USE_VERTEXAI` | — | Set `true` for Vertex AI |
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
-|---|---|---|
-| `401 Authentication required` | Missing or invalid Bearer token | Check token: `curl -s http://localhost:8180/realms/mcp/protocol/openid-connect/token -d grant_type=client_credentials -d client_id=adk-agui-client -d client_secret=adk-agui-secret` |
-| Token introspection `active: false` in Docker | Keycloak hostname mismatch | Ensure `--hostname http://localhost:8180 --hostname-backchannel-dynamic true` in Keycloak command |
-| `curl: (7) Failed to connect` | Service not running | `docker ps` to check status; `docker compose up <service> -d` |
-| Keycloak unhealthy | Slow startup | Wait 30–60s; check `docker logs mcps-keycloak-1` |
-| `ModuleNotFoundError: mcp_utils` | Shared lib not installed | `pip install -e ../../shared/` in server venv |
+|---------|-------|-----|
+| `401 Authentication required` | Missing or expired Bearer token | Get a fresh token (see Step 5) |
+| Token introspection returns `active: false` | Keycloak hostname mismatch in Docker | Ensure `--hostname http://localhost:8180 --hostname-backchannel-dynamic true` in Keycloak command |
+| OIDC id_token rejected by greeting server | Issuer mismatch | The `OIDCIdTokenVerifier` auto-discovers the canonical issuer from Keycloak's OIDC config — ensure Keycloak is reachable from the server container |
+| `Connection refused` | Service not running | `docker ps` to check; `docker compose up <service> -d` |
+| Keycloak stuck starting | Slow Docker or low memory | Wait 60s; check `docker logs mcps-keycloak-1` |
+| `ModuleNotFoundError: mcp_utils` | Shared lib not installed | `pip install -e ../../shared/` in the server's venv |
+| Registry shows `unknown` status | Status checker hasn't run yet | Wait 60 seconds for the first check cycle |
+| Calculator returns 404 | Wrong URL | Calculator has no auth — hit `http://localhost:9004/mcp` directly |
+
+---
 
 ## Changelog
+
+### v0.5.0 — Multi-Auth MCP Servers + OIDC Id-Token Support
+
+- **Calculator server** (port 9004): New open MCP server with no authentication — 3 tools: `add`, `multiply`, `factorial`
+- **Greeting server** (port 9005): New OIDC-protected MCP server — validates `id_token` JWT via Keycloak's JWKS endpoint (no introspection), 2 tools: `greet`, `farewell` in 10 languages
+- **`OIDCIdTokenVerifier`**: New token verifier in `shared/mcp_utils/oauth_middleware.py` — verifies JWT signature via JWKS, auto-discovers canonical issuer from OIDC discovery (handles Docker hostname mismatch)
+- **Three auth strategies**: `none` (open), `oauth` (client_credentials + introspection), `oidc` (id_token + JWT/JWKS) — demonstrated across the 4 servers
+- **ADK client OIDC support**: `auth` field now accepts `"oidc"` — fetches id_token via password grant with `scope=openid`, sends as Bearer token
+- **Registry multi-auth probing**: Status checker handles all three auth types when probing servers
+- **Keycloak `greeting-server` client**: Added to `realm-export.json`
+- **Enterprise README**: Complete rewrite with progressive detail, DFD diagrams, Keycloak local IdP guide, production GCP architecture, auth strategy comparison
 
 ### v0.4.0 — MCP Registry with Docker Deploy & OAuth-Aware Status Checker
 
@@ -475,35 +904,27 @@ All servers share the same auth setting. Simpler, but less flexible.
 
 ### v0.3.0 — Pluggable Client Config & Architecture Docs
 
-- **Per-server OAuth control**: New `MCPServerConfig` dataclass in the ADK client — each MCP server independently enables/disables OAuth via the `MCP_SERVERS` JSON env var
-- **Dual connectivity model**: Clients can connect via the Gateway (single aggregated endpoint) or directly to individual MCP servers
-- **IdP-agnostic design**: Documented that Keycloak is the dev IdP; any OIDC-compliant provider (Auth0, Okta, Azure AD, etc.) works in production via standard RFC 7662 introspection
-- **Architecture diagram**: Rewritten to show both Gateway and direct connection paths
-- **Comprehensive README**: Full local setup guide (7 steps), "Adding a New MCP Server" template, pluggable config docs, env vars reference, troubleshooting table
-- **Updated copilot instructions & skill files**: `.github/copilot-instructions.md` and `.github/skills/local-docker-deploy/SKILL.md` reflect all OAuth, dual-connectivity, and Docker patterns
+- **Per-server OAuth control**: `MCPServerConfig` dataclass — each MCP server independently enables/disables OAuth via `MCP_SERVERS` JSON
+- **Dual connectivity model**: Gateway (single endpoint) or direct (per-server URLs)
+- **IdP-agnostic design**: Any OIDC-compliant provider works via standard RFC 7662 introspection
 
 ### v0.2.0 — Native OAuth via FastMCP + Keycloak
 
-- **FastMCP native auth**: MCP servers use `AuthSettings` + `KeycloakTokenVerifier` (MCP SDK's `TokenVerifier` protocol) instead of custom middleware
-- **RFC 7662 token introspection**: `KeycloakTokenVerifier` validates Bearer tokens via Keycloak's introspection endpoint — works with all grant types including `client_credentials`
-- **Per-server OAuth credentials**: Each MCP server in docker-compose has its own `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET`
-- **Keycloak hostname fix**: `--hostname http://localhost:8180 --hostname-backchannel-dynamic true` resolves token mismatch between `localhost:8180` (external) and `keycloak:8080` (Docker-internal)
-- **Python-based Docker healthchecks**: Replaced `curl` with `urllib.request` — `python:3.12-slim` doesn't include curl; HTTP 401 treated as healthy
-- **Keycloak realm auto-import**: `infra/keycloak/realm-export.json` with pre-configured clients, roles, and test users
+- **FastMCP native auth**: `AuthSettings` + `KeycloakTokenVerifier` (MCP SDK's `TokenVerifier` protocol)
+- **RFC 7662 token introspection**: Works with all grant types including `client_credentials`
+- **Keycloak hostname fix**: `--hostname-backchannel-dynamic true` resolves Docker hostname mismatch
 
 ### v0.1.0 — Multi-Transport MCP Servers + ADK Client
 
-- **Weather & Stock MCP servers**: FastMCP-based servers with `stdio`, `sse`, and `streamable-http` transport via `--transport` CLI flag / `MCP_TRANSPORT` env var
-- **Google ADK + AG-UI client**: Supervisor agent with Gemini (Vertex AI), chat UI on port 8001, auto-discovers tools from remote MCP servers via `MCPToolset`
-- **Docker deployment**: Server Dockerfiles with repo-root build context (for `shared/` COPY), hatchling builds with `packages = ["src"]`
-- **Gateway**: Aggregating reverse-proxy that unifies multiple MCP servers behind a single endpoint
-- **Registry**: FastAPI backend + React frontend for browsing/registering MCP servers
-- **Shared library**: `mcp_utils` package with base classes, types, and credential helpers
+- **Weather & Stock MCP servers**: FastMCP with `stdio`, `sse`, `streamable-http` transport
+- **Google ADK + AG-UI client**: Gemini-powered chat UI, auto-discovers tools via `MCPToolset`
+- **Docker deployment**: Server Dockerfiles, hatchling builds, Docker Compose orchestration
 
 ### v0.0.1 — Initial Commit
 
-- Monorepo scaffold: servers, clients, gateway, registry, shared, infra directories
-- Basic project structure and build configuration
+- Monorepo scaffold and build configuration
+
+---
 
 ## License
 

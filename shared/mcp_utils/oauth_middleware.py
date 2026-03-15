@@ -2,17 +2,17 @@
 OAuth2/OIDC integration for MCP servers — Keycloak token validation.
 
 Provides:
-  - KeycloakTokenVerifier: Implements MCP SDK's TokenVerifier protocol for
-    native FastMCP auth integration (the standard way).
+  - KeycloakTokenVerifier: Validates tokens via RFC 7662 introspection — for
+    client_credentials access tokens (weather, stock servers).
+  - OIDCIdTokenVerifier: Validates OIDC id_tokens by verifying JWT signature
+    against Keycloak's JWKS endpoint — no introspection needed (greeting server).
   - OAuthMiddleware: Legacy Starlette middleware (kept for non-FastMCP services).
-
-Token verification uses Keycloak's token introspection endpoint, which works
-reliably with all grant types including client_credentials (service accounts).
 """
 from __future__ import annotations
 
 import os
 import httpx
+import jwt
 from functools import lru_cache
 
 from mcp.server.auth.provider import AccessToken, TokenVerifier
@@ -95,6 +95,75 @@ class KeycloakTokenVerifier(TokenVerifier):
                     expires_at=info.get("exp"),
                 )
         except Exception:
+            return None
+
+
+# ── OIDC Id-Token Verifier (JWT/JWKS — no introspection) ─────────────────────
+
+@lru_cache(maxsize=4)
+def _get_jwks_client(jwks_url: str) -> jwt.PyJWKClient:
+    """Create a cached JWKS client for a given URL."""
+    return jwt.PyJWKClient(jwks_url, cache_keys=True)
+
+
+class OIDCIdTokenVerifier(TokenVerifier):
+    """
+    Validates OIDC id_tokens by verifying the JWT signature against
+    Keycloak's JWKS endpoint — no introspection call needed.
+
+    This verifier:
+      1. Discovers the JWKS URI and canonical issuer from OIDC discovery
+      2. Fetches the signing keys from the JWKS endpoint
+      3. Verifies the JWT signature (RS256)
+      4. Checks issuer and expiration claims
+      5. Returns an AccessToken with user identity from the JWT
+
+    The canonical issuer is read from the OIDC discovery document, so it
+    works correctly even when Keycloak is reached via a Docker-internal URL
+    but tokens carry the external hostname (--hostname flag).
+    """
+
+    def __init__(
+        self,
+        keycloak_url: str | None = None,
+        realm: str | None = None,
+    ):
+        self._keycloak_url = keycloak_url or KEYCLOAK_URL
+        self._realm = realm or KEYCLOAK_REALM
+        # Discover canonical issuer and JWKS URI from OIDC config
+        oidc = _get_oidc_config(self._keycloak_url, self._realm)
+        self._issuer = oidc["issuer"]
+        self._jwks_url = oidc.get(
+            "jwks_uri",
+            f"{self._keycloak_url}/realms/{self._realm}"
+            f"/protocol/openid-connect/certs",
+        )
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        """Verify an OIDC id_token by checking its JWT signature via JWKS."""
+        try:
+            jwks_client = _get_jwks_client(self._jwks_url)
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+
+            claims = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                issuer=self._issuer,
+                options={
+                    "verify_aud": False,  # id_tokens have varying audiences
+                    "verify_exp": True,
+                    "verify_iss": True,
+                },
+            )
+
+            return AccessToken(
+                token=token,
+                client_id=claims.get("azp", claims.get("sub", "unknown")),
+                scopes=claims.get("scope", "").split() if claims.get("scope") else [],
+                expires_at=claims.get("exp"),
+            )
+        except (jwt.InvalidTokenError, jwt.PyJWKClientError, Exception):
             return None
 
 

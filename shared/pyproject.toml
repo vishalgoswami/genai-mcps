@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.7.0",
     "starlette>=0.38.0",
     "pyyaml>=6.0",
+    "PyJWT[crypto]>=2.8.0",
 ]
 
 [tool.hatch.build.targets.wheel]

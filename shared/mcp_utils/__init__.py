@@ -1,7 +1,7 @@
 """mcp_shared — re-exports for convenience."""
 from .types import ToolDef, ToolCallResult
 from .client_base import BaseMCPClient
-from .oauth_middleware import OAuthMiddleware, KeycloakTokenVerifier
+from .oauth_middleware import OAuthMiddleware, KeycloakTokenVerifier, OIDCIdTokenVerifier
 from .credentials import (
     load_credentials,
     get_keycloak_config,
@@ -24,6 +24,7 @@ __all__ = [
     "BaseMCPServer",
     "OAuthMiddleware",
     "KeycloakTokenVerifier",
+    "OIDCIdTokenVerifier",
     "load_credentials",
     "get_keycloak_config",
     "get_server_creds",

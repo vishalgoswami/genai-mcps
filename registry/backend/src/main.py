@@ -42,6 +42,22 @@ _DEFAULT_SERVERS = [
         "owner": "platform",
         "auth_type": "oauth",
     },
+    {
+        "name": "calculator",
+        "description": "Basic math — add, multiply, factorial",
+        "url": "http://calculator-server:9004/mcp",
+        "tags": "math,calculator,arithmetic",
+        "owner": "platform",
+        "auth_type": "none",
+    },
+    {
+        "name": "greeting",
+        "description": "Greetings & farewells in 10 languages (OIDC id_token)",
+        "url": "http://greeting-server:9005/mcp",
+        "tags": "greeting,language,oidc",
+        "owner": "platform",
+        "auth_type": "oidc",
+    },
 ]
 
 

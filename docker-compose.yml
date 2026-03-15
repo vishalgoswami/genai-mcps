@@ -64,6 +64,38 @@ services:
       timeout: 5s
       retries: 3
 
+  calculator-server:
+    build:
+      context: .
+      dockerfile: servers/calculator/Dockerfile
+    ports:
+      - "9004:9004"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9004/mcp')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  greeting-server:
+    build:
+      context: .
+      dockerfile: servers/greeting/Dockerfile
+    ports:
+      - "9005:9005"
+    env_file: .env
+    environment:
+      MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-mcp}
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,urllib.error;\ntry: urllib.request.urlopen('http://localhost:9005/mcp')\nexcept urllib.error.HTTPError: pass"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # ── MCP Gateway (aggregating proxy) ─────────────
   gateway:
     build:
@@ -81,6 +113,8 @@ services:
     depends_on:
       - weather-server
       - stock-server
+      - calculator-server
+      - greeting-server
 
   # ── Registry ─────────────────────────────────────
   registry-backend:
@@ -95,6 +129,8 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-mcp}
       REGISTRY_OAUTH_CLIENT_ID: mcp-registry
       REGISTRY_OAUTH_CLIENT_SECRET: registry-secret
+      OIDC_USERNAME: testuser
+      OIDC_PASSWORD: testpass
       STATUS_CHECK_INTERVAL: "60"
     volumes:
       - registry-data:/app/data
@@ -104,6 +140,10 @@ services:
       weather-server:
         condition: service_started
       stock-server:
+        condition: service_started
+      calculator-server:
+        condition: service_started
+      greeting-server:
         condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]

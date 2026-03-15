@@ -51,6 +51,29 @@
       ]
     },
     {
+      "clientId": "greeting-server",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "greeting-server-secret",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
+      "redirectUris": [
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
+    },
+    {
       "clientId": "mcp-gateway",
       "enabled": true,
       "protocol": "openid-connect",

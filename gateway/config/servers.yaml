@@ -14,3 +14,15 @@ servers:
     description: "Stock prices, history, and company info via Yahoo Finance"
     enabled: true
     auth: false
+
+  - name: calculator
+    url: http://calculator-server:9004/mcp
+    description: "Basic math operations — add, multiply, factorial"
+    enabled: true
+    auth: false
+
+  - name: greeting
+    url: http://greeting-server:9005/mcp
+    description: "Greetings and farewells in 10 languages (OIDC-protected)"
+    enabled: true
+    auth: false

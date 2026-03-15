@@ -6,14 +6,18 @@ This is a Python monorepo for Model Context Protocol (MCP) servers, clients, a g
 
 ```
 mcps/
-├── servers/          # MCP servers (weather, stock, …) — FastMCP + streamable HTTP
-├── gateway/          # Aggregating reverse-proxy that unifies multiple MCP servers
+├── servers/          # MCP servers — FastMCP + streamable HTTP
+│   ├── weather/      # 🔒 OAuth (introspection) — port 9002
+│   ├── stock/        # 🔒 OAuth (introspection) — port 9003
+│   ├── calculator/   # 🔓 No auth — port 9004
+│   └── greeting/     # 🔑 OIDC (JWT/JWKS) — port 9005
+├── gateway/          # Aggregating reverse-proxy that unifies all MCP servers
 ├── clients/          # Client apps that consume MCP servers
 │   ├── adk-agui/     # Google ADK + AG-UI conversational agent (port 8001)
 │   ├── cli/          # Interactive terminal REPL
 │   └── langgraph/    # LangGraph agent (port 8002)
 ├── registry/         # Web-based MCP server registry (backend + frontend)
-├── shared/           # Shared Python library (mcp_utils) — OAuth middleware, base classes, types
+├── shared/           # Shared Python library (mcp_utils) — OAuth verifiers, base classes, types
 ├── infra/            # Keycloak realm config, centralized credentials template
 └── docs/             # Architecture diagrams
 ```
@@ -24,49 +28,64 @@ mcps/
 - **Multi-transport**: Every MCP server supports `stdio`, `sse`, and `streamable-http` via `--transport` CLI flag or `MCP_TRANSPORT` env var. Default is `stdio` locally, `streamable-http` in Docker.
 - **Dual connectivity**: Clients can connect via the **Gateway** (single URL, centralized routing/auth) or **directly** to individual MCP servers (per-server URLs). The ADK client defaults to direct connections configured via `MCP_SERVERS` JSON.
 - **Auth via ADC**: Client apps (adk-agui, langgraph) use Google Cloud Application Default Credentials — never API keys. Set `GOOGLE_GENAI_USE_VERTEXAI=true` in `.env`.
-- **OAuth via OIDC (optional)**: MCP servers use FastMCP's native auth (`AuthSettings` + `token_verifier`) powered by `KeycloakTokenVerifier` in `shared/mcp_utils/oauth_middleware.py`. Enable with `MCP_AUTH_ENABLED=true`. Token validation uses RFC 7662 introspection (works with all grant types including `client_credentials`). Keycloak is the dev IdP; any OIDC-compliant provider (Auth0, Okta, Azure AD, etc.) can be used in production — the verifier discovers the introspection endpoint from `/.well-known/openid-configuration`.
-- **Pluggable MCP client config**: The ADK client (`clients/adk-agui`) uses `MCPServerConfig` with per-server auth control. Configure via `MCP_SERVERS` JSON array (preferred) or legacy `MCP_SERVER_URLS` comma-separated list. See "Client Configuration" section below.
+- **Three auth strategies**: MCP servers demonstrate three authentication models via `MCP_AUTH_ENABLED`:
+  - **None** (calculator): No auth. Open to all callers.
+  - **OAuth / introspection** (weather, stock): Uses `KeycloakTokenVerifier` — validates `access_token` via RFC 7662 introspection. Client uses `client_credentials` grant.
+  - **OIDC / JWT+JWKS** (greeting): Uses `OIDCIdTokenVerifier` — validates `id_token` JWT signature via JWKS endpoint. Client uses `password` grant with `scope=openid`. Discovers canonical issuer from OIDC discovery to handle Docker hostname mismatch.
+  Both verifiers live in `shared/mcp_utils/oauth_middleware.py` and discover endpoints from `/.well-known/openid-configuration`, making them IdP-agnostic.
+- **Pluggable MCP client config**: The ADK client (`clients/adk-agui`) uses `MCPServerConfig` with per-server auth control. The `auth` field accepts `false` (no auth), `true`/`"oauth"` (client_credentials), or `"oidc"` (password grant → id_token). Configure via `MCP_SERVERS` JSON array (preferred) or legacy `MCP_SERVER_URLS` comma-separated list.
 - **Hatchling builds**: All Python packages use hatchling. Source lives in `src/`, so every `pyproject.toml` needs `[tool.hatch.build.targets.wheel] packages = ["src"]` (or `["mcp_utils"]` for shared).
-- **Docker context**: Server Dockerfiles use the repo root as build context (to COPY `shared/`). Use `docker build -f servers/<name>/Dockerfile .` from root.
+- **Docker context**: Server Dockerfiles use the repo root as build context (to COPY `shared/`). Use `docker build -f servers/<name>/Dockerfile .` from root. Exception: calculator has no auth, so no `shared/` COPY needed.
 - **Docker healthchecks**: Use Python (`urllib.request`) instead of `curl` — `python:3.12-slim` doesn't include curl. Healthchecks treat HTTP 401 as healthy (server is up, just requires auth).
 
 ## Port Assignments
 
-| Component | Port |
-|---|---|
-| Gateway | 8000 |
-| ADK+AGUI Client | 8001 |
-| LangGraph Client | 8002 |
-| Registry Backend | 8080 |
-| Registry Frontend | 3000 |
-| Keycloak | 8180 |
-| MCP Servers | 9001+ (weather=9002, stock=9003) |
+| Component | Port | Auth |
+|---|---|---|
+| Gateway | 8000 | — |
+| ADK+AGUI Client | 8001 | — |
+| LangGraph Client | 8002 | — |
+| Registry Backend | 8080 | — |
+| Registry Frontend | 3000 | — |
+| Keycloak | 8180 | — |
+| Weather Server | 9002 | 🔒 OAuth (introspection) |
+| Stock Server | 9003 | 🔒 OAuth (introspection) |
+| Calculator Server | 9004 | 🔓 None |
+| Greeting Server | 9005 | 🔑 OIDC (JWT/JWKS) |
 
-## OAuth Architecture
+## Auth Architecture
 
-### Server-Side (FastMCP Native Auth)
+### Three Token Verification Strategies
 
-MCP servers use the MCP SDK's built-in auth chain when `MCP_AUTH_ENABLED=true`:
+**1. No Auth (Calculator)**
+- Server accepts all requests without `Authorization` header.
 
+**2. OAuth — Access Token Introspection (Weather, Stock)**
 ```python
 from mcp_utils import KeycloakTokenVerifier
-from mcp.server.auth.settings import AuthSettings
-
-mcp = FastMCP(
-    "my-server",
-    auth=AuthSettings(
-        issuer_url=f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}",
-        resource_server_url=f"http://localhost:{port}",
-    ),
-    token_verifier=KeycloakTokenVerifier(),
-)
+mcp = FastMCP("weather", auth=AuthSettings(...), token_verifier=KeycloakTokenVerifier(...))
 ```
+- Client obtains `access_token` via `client_credentials` grant
+- Server introspects the token with Keycloak (RFC 7662) — `POST /token/introspect`
+- Server's own `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` authenticate the introspection call
 
-`KeycloakTokenVerifier` implements the MCP SDK's `TokenVerifier` protocol using Keycloak's introspection endpoint. The server's own `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` authenticate the introspection call.
+**3. OIDC — Id Token JWT/JWKS Verification (Greeting)**
+```python
+from mcp_utils import OIDCIdTokenVerifier
+mcp = FastMCP("greeting", auth=AuthSettings(...), token_verifier=OIDCIdTokenVerifier(...))
+```
+- Client obtains `id_token` via `password` grant (or `authorization_code`) with `scope=openid`
+- Server verifies JWT signature locally using Keycloak's JWKS endpoint — no introspection call
+- `OIDCIdTokenVerifier` discovers the canonical issuer from OIDC discovery (`/.well-known/openid-configuration`) to handle Docker hostname mismatch (`localhost:8180` vs `keycloak:8080`)
 
-### Client-Side (Per-Server Auth)
+### Client-Side Auth (ADK Client)
 
-The ADK client uses `client_credentials` grant to obtain tokens, then sends `Authorization: Bearer <token>` headers per-server. Each server's auth is independently controllable.
+The ADK client supports three auth modes per server:
+- `auth: false` or omitted → no `Authorization` header
+- `auth: true` or `auth: "oauth"` → `client_credentials` grant → `access_token` as Bearer
+- `auth: "oidc"` → `password` grant with `scope=openid` → `id_token` as Bearer
+
+Uses `OIDC_USERNAME` / `OIDC_PASSWORD` env vars for the password grant flow.
 
 ### Keycloak Hostname
 
@@ -74,32 +93,26 @@ The ADK client uses `client_credentials` grant to obtain tokens, then sends `Aut
 
 ## Client Configuration
 
-The ADK+AGUI client supports two config formats via environment variables:
-
-**Option 1 — JSON array (recommended, per-server auth):**
+The ADK+AGUI client supports per-server auth via `MCP_SERVERS` JSON:
 
 ```env
 MCP_SERVERS=[
-  {"url": "http://localhost:9002/mcp", "auth": true},
-  {"url": "http://localhost:9003/mcp", "auth": true},
-  {"url": "http://localhost:9004/mcp", "auth": false}
+  {"url": "http://localhost:9002/mcp", "auth": "oauth"},
+  {"url": "http://localhost:9003/mcp", "auth": "oauth"},
+  {"url": "http://localhost:9004/mcp"},
+  {"url": "http://localhost:9005/mcp", "auth": "oidc"}
 ]
 ```
 
-**Option 2 — Comma-separated URLs (legacy, all-or-nothing):**
-
-```env
-MCP_SERVER_URLS=http://localhost:9002/mcp,http://localhost:9003/mcp
-MCP_AUTH_ENABLED=true
-```
-
-Global OAuth settings for authenticated servers:
+Global OAuth/OIDC settings:
 
 ```env
 KEYCLOAK_URL=http://localhost:8180
 KEYCLOAK_REALM=mcp
 OAUTH_CLIENT_ID=adk-agui-client
 OAUTH_CLIENT_SECRET=adk-agui-secret
+OIDC_USERNAME=testuser
+OIDC_PASSWORD=testpass
 ```
 
 ## Code Style
@@ -124,12 +137,25 @@ docker run -p 9002:9002 mcp-weather
 # Full stack
 docker compose up
 
-# Test OAuth-protected endpoint
+# Test OAuth (access_token introspection):
 TOKEN=$(curl -s -X POST http://localhost:8180/realms/mcp/protocol/openid-connect/token \
-  -d "grant_type=client_credentials" -d "client_id=mcp-server" \
-  -d "client_secret=changeme" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+  -d "grant_type=client_credentials" -d "client_id=adk-agui-client" \
+  -d "client_secret=adk-agui-secret" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 curl -X POST http://localhost:9002/mcp -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+
+# Test OIDC (id_token JWT/JWKS):
+ID_TOKEN=$(curl -s -X POST http://localhost:8180/realms/mcp/protocol/openid-connect/token \
+  -d "grant_type=password" -d "client_id=adk-agui-client" -d "client_secret=adk-agui-secret" \
+  -d "username=testuser" -d "password=testpass" -d "scope=openid" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id_token'])")
+curl -X POST http://localhost:9005/mcp -H "Authorization: Bearer $ID_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+
+# Test no-auth (calculator):
+curl -X POST http://localhost:9004/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
 ```
 
@@ -142,3 +168,6 @@ curl -X POST http://localhost:9002/mcp -H "Authorization: Bearer $TOKEN" \
 - Docker-compose Keycloak uses `--hostname http://localhost:8180 --hostname-backchannel-dynamic true`
 - Each MCP server in docker-compose has its own `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET`
 - Docker healthchecks use `python -c "import urllib.request..."` (not curl)
+- Calculator server has no `shared/` dependency (no auth) — its Dockerfile does NOT COPY shared/
+- `OIDCIdTokenVerifier` uses `PyJWT[crypto]>=2.8.0` for JWT/JWKS verification
+- Registry status checker supports all three auth types (`none`, `oauth`, `oidc`) when probing servers
