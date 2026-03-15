@@ -1,0 +1,16 @@
+# Gateway — Upstream MCP Servers
+# The gateway connects to these servers, discovers their tools,
+# and re-exposes them as a unified MCP endpoint.
+# Set auth: true for servers that require client_credentials OAuth.
+servers:
+  - name: weather
+    url: http://weather-server:9002/mcp
+    description: "US weather alerts and forecasts via NWS API"
+    enabled: true
+    auth: false
+
+  - name: stock
+    url: http://stock-server:9003/mcp
+    description: "Stock prices, history, and company info via Yahoo Finance"
+    enabled: true
+    auth: false

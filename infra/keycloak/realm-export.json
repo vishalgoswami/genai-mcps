@@ -1,0 +1,128 @@
+{
+  "realm": "mcp",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "clients": [
+    {
+      "clientId": "weather-server",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "weather-server-secret",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["openid", "profile", "email"]
+    },
+    {
+      "clientId": "stock-server",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "stock-server-secret",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["openid", "profile", "email"]
+    },
+    {
+      "clientId": "mcp-gateway",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "gateway-secret",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["openid", "profile", "email"]
+    },
+    {
+      "clientId": "adk-agui-client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "adk-agui-secret",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["openid", "profile", "email"]
+    },
+    {
+      "clientId": "cli-client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "cli-secret",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["openid", "profile", "email"]
+    },
+    {
+      "clientId": "langgraph-client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "langgraph-secret",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["openid", "profile", "email"]
+    },
+    {
+      "clientId": "mcp-client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["openid", "profile", "email"]
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "email": "testuser@example.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "testpass",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["default-roles-mcp"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "mcp-user",
+        "description": "Can access MCP server tools"
+      }
+    ]
+  }
+}

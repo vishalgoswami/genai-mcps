@@ -1,0 +1,98 @@
+version: "3.9"
+
+services:
+  # ── Keycloak OIDC Provider ───────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: start-dev --import-realm
+    ports:
+      - "8180:8080"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── MCP Servers (streamable HTTP) ────────────────
+  weather-server:
+    build:
+      context: .
+      dockerfile: servers/weather/Dockerfile
+    ports:
+      - "9002:9002"
+    env_file: .env
+    environment:
+      MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-mcp}
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9002/mcp"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  stock-server:
+    build:
+      context: .
+      dockerfile: servers/stock/Dockerfile
+    ports:
+      - "9003:9003"
+    env_file: .env
+    environment:
+      MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-mcp}
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9003/mcp"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── MCP Gateway (aggregating proxy) ─────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-mcp}
+      GATEWAY_PORT: "8000"
+      CREDENTIALS_FILE: /app/infra/credentials.yaml
+    depends_on:
+      - weather-server
+      - stock-server
+
+  # ── Registry ─────────────────────────────────────
+  registry-backend:
+    build: ./registry/backend
+    ports:
+      - "8080:8080"
+    env_file: .env
+    volumes:
+      - registry-data:/app/data
+
+  registry-frontend:
+    build: ./registry/frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - registry-backend
+
+volumes:
+  registry-data:

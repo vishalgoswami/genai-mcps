@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment / secrets
+.env
+# Note: infra/credentials.yaml has placeholder secrets — safe to commit.
+# In production, override via env vars or a secrets manager.
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+registry/frontend/dist/
+registry/frontend/build/
+
+# Database
+*.db
+*.sqlite3
+
+# Docker
+*.log
+
+# OS
+Thumbs.db

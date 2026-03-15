@@ -1,0 +1,20 @@
+# Template Dockerfile for MCP servers
+# Copy this into any new server directory and adjust EXPOSE port & CMD
+# Build context should be the project root (.) so shared/ can be copied
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install shared library (includes OAuth middleware)
+COPY shared/ /app/shared/
+RUN pip install --no-cache-dir -e /app/shared
+
+# Install the MCP server — adjust paths below
+COPY servers/<SERVER_NAME>/pyproject.toml /app/pyproject.toml
+COPY servers/<SERVER_NAME>/src/ /app/src/
+RUN pip install --no-cache-dir -e .
+
+# Override EXPOSE and CMD per server
+EXPOSE 9001
+CMD ["python", "-m", "src.server"]
