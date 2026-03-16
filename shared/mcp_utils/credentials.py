@@ -79,3 +79,37 @@ async def fetch_client_credentials_token(
         )
         resp.raise_for_status()
         return resp.json()["access_token"]
+
+
+async def fetch_oidc_id_token(
+    client_id: str,
+    client_secret: str,
+    username: str,
+    password: str,
+    keycloak_url: Optional[str] = None,
+    realm: Optional[str] = None,
+) -> str:
+    """
+    Perform an OIDC password grant against Keycloak and return the id_token.
+    Used when the caller needs a JWT with user identity (e.g., for OIDC servers).
+    """
+    kc = get_keycloak_config()
+    url = keycloak_url or kc.get("internal_url", kc.get("url", "http://localhost:8180"))
+    r = realm or kc.get("realm", "mcp")
+    token_url = f"{url}/realms/{r}/protocol/openid-connect/token"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            token_url,
+            data={
+                "grant_type": "password",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "username": username,
+                "password": password,
+                "scope": "openid",
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json()["id_token"]

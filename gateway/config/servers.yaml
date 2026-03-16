@@ -1,28 +1,29 @@
 # Gateway — Upstream MCP Servers
+#
 # The gateway connects to these servers, discovers their tools,
 # and re-exposes them as a unified MCP endpoint.
-# Set auth: true for servers that require client_credentials OAuth.
+#
+# auth_type controls how the gateway authenticates with each upstream server:
+#   none  — No authentication required (open server)
+#   oauth — Gateway fetches its own client_credentials access_token
+#   oidc  — Gateway passes through the client's OIDC id_token
 servers:
   - name: weather
     url: http://weather-server:9002/mcp
     description: "US weather alerts and forecasts via NWS API"
-    enabled: true
-    auth: false
+    auth_type: oauth
 
   - name: stock
     url: http://stock-server:9003/mcp
     description: "Stock prices, history, and company info via Yahoo Finance"
-    enabled: true
-    auth: false
+    auth_type: oauth
 
   - name: calculator
     url: http://calculator-server:9004/mcp
     description: "Basic math operations — add, multiply, factorial"
-    enabled: true
-    auth: false
+    auth_type: none
 
   - name: greeting
     url: http://greeting-server:9005/mcp
     description: "Greetings and farewells in 10 languages (OIDC-protected)"
-    enabled: true
-    auth: false
+    auth_type: oidc

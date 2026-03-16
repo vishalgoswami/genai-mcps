@@ -14,7 +14,7 @@ COPY gateway/config/ /app/config/
 # Also copy credentials file
 COPY infra/credentials.yaml /app/infra/credentials.yaml
 
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir .
 
 EXPOSE 8000
 

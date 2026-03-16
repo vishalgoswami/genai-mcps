@@ -9,6 +9,7 @@ from .credentials import (
     get_gateway_creds,
     get_client_creds,
     fetch_client_credentials_token,
+    fetch_oidc_id_token,
 )
 
 # server_base depends on fastapi which is not installed in all environments
@@ -31,4 +32,5 @@ __all__ = [
     "get_gateway_creds",
     "get_client_creds",
     "fetch_client_credentials_token",
+    "fetch_oidc_id_token",
 ]

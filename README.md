@@ -60,7 +60,7 @@ This template wires all of that together so you can learn the patterns, then ada
 |-----------|-------------|
 | **4 MCP Servers** | Weather, stock, calculator, greeting — each with a different auth model |
 | **ADK Chat Client** | Google Gemini-powered chat that auto-discovers and calls tools across all servers |
-| **API Gateway** | Single endpoint that aggregates all servers behind one URL |
+| **API Gateway** | Smart auth proxy — aggregates tools, handles per-server auth automatically |
 | **Service Registry** | Web UI + API that catalogs servers, probes their health, and counts their tools |
 | **Keycloak IdP** | Local OIDC identity provider with pre-configured clients, users, and realms |
 | **Docker Compose** | One command to start the entire stack |
@@ -429,7 +429,7 @@ docker compose up registry-backend registry-frontend gateway -d
 
 - **Registry UI**: http://localhost:3000 — browse all MCP servers, their status, and tool counts
 - **Registry API**: http://localhost:8080/api/servers/
-- **Gateway**: http://localhost:8000/mcp — single aggregated MCP endpoint
+- **Gateway**: http://localhost:8000/mcp — smart auth proxy, aggregates all tools, handles per-server auth
 
 ### Full stack (one command)
 
@@ -880,6 +880,18 @@ mcps/
 ---
 
 ## Changelog
+
+### v0.6.0 — Gateway Smart Auth Proxy
+
+- **Gateway redesign**: Rewrote the MCP gateway as a smart auth proxy that aggregates tools from all 4 upstream servers (11 tools) into a single MCP endpoint at `:8000/mcp`
+- **Per-server auth handling**: Gateway manages upstream auth automatically — `client_credentials` for OAuth servers (weather, stock), id_token pass-through for OIDC servers (greeting), no auth for open servers (calculator)
+- **Low-level MCP Server**: Gateway uses `mcp.server.Server` (not `FastMCP`) with `StreamableHTTPSessionManager` for raw argument passthrough — avoids Pydantic schema validation on proxy calls, preserves upstream `inputSchema` exactly
+- **Tool namespacing**: Upstream tools exposed as `{server}__{tool}` (e.g., `weather__get_forecast`)
+- **ASGI token middleware**: `_TokenExtractMiddleware` extracts client Bearer token into `ContextVar` for OIDC pass-through
+- **Token caching**: OAuth access tokens cached with ~4.5 min TTL to avoid per-request Keycloak calls
+- **`servers.yaml` auth_type**: Config uses `auth_type: none|oauth|oidc` per server (replaces old `auth: true/false`)
+- **`fetch_oidc_id_token`**: New helper in `shared/mcp_utils/credentials.py` — password grant with `scope=openid` → returns `id_token`
+- **Gateway README**: Comprehensive design docs with auth flow diagrams, configuration reference, testing examples
 
 ### v0.5.0 — Multi-Auth MCP Servers + OIDC Id-Token Support
 

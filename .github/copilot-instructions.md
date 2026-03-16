@@ -11,7 +11,7 @@ mcps/
 │   ├── stock/        # 🔒 OAuth (introspection) — port 9003
 │   ├── calculator/   # 🔓 No auth — port 9004
 │   └── greeting/     # 🔑 OIDC (JWT/JWKS) — port 9005
-├── gateway/          # Aggregating reverse-proxy that unifies all MCP servers
+├── gateway/          # Smart auth proxy — aggregates tools, handles per-server auth
 ├── clients/          # Client apps that consume MCP servers
 │   ├── adk-agui/     # Google ADK + AG-UI conversational agent (port 8001)
 │   ├── cli/          # Interactive terminal REPL
@@ -25,8 +25,10 @@ mcps/
 ## Key Design Decisions
 
 - **MCP SDK**: All servers use `mcp.server.fastmcp.FastMCP`. Host/port are constructor kwargs; `run()` only takes `transport`.
+- **Gateway uses low-level Server**: The gateway uses `mcp.server.Server` (not `FastMCP`) with `StreamableHTTPSessionManager` for raw argument passthrough — avoids Pydantic schema validation on proxy tool calls. Tool definitions preserve upstream `inputSchema` exactly.
 - **Multi-transport**: Every MCP server supports `stdio`, `sse`, and `streamable-http` via `--transport` CLI flag or `MCP_TRANSPORT` env var. Default is `stdio` locally, `streamable-http` in Docker.
 - **Dual connectivity**: Clients can connect via the **Gateway** (single URL, centralized routing/auth) or **directly** to individual MCP servers (per-server URLs). The ADK client defaults to direct connections configured via `MCP_SERVERS` JSON.
+- **Gateway smart auth proxy**: The gateway handles per-server auth so clients don't have to. Clients send a single OIDC id_token for user identity; the gateway manages OAuth client_credentials for protected servers, passes through id_tokens for OIDC servers, and sends no auth for open servers. Auth type per server is configured in `gateway/config/servers.yaml` via `auth_type: none|oauth|oidc`.
 - **Auth via ADC**: Client apps (adk-agui, langgraph) use Google Cloud Application Default Credentials — never API keys. Set `GOOGLE_GENAI_USE_VERTEXAI=true` in `.env`.
 - **Three auth strategies**: MCP servers demonstrate three authentication models via `MCP_AUTH_ENABLED`:
   - **None** (calculator): No auth. Open to all callers.
@@ -86,6 +88,17 @@ The ADK client supports three auth modes per server:
 - `auth: "oidc"` → `password` grant with `scope=openid` → `id_token` as Bearer
 
 Uses `OIDC_USERNAME` / `OIDC_PASSWORD` env vars for the password grant flow.
+
+### Gateway Auth (Smart Proxy)
+
+The gateway (`gateway/src/main.py`) handles all upstream auth automatically:
+- `auth_type: none` → no Authorization header sent upstream
+- `auth_type: oauth` → gateway fetches its own `client_credentials` access_token from Keycloak and sends it as Bearer
+- `auth_type: oidc` → gateway passes through the client's OIDC id_token to the upstream server
+
+The gateway uses ASGI middleware (`_TokenExtractMiddleware`) to extract the client's Bearer token into a `ContextVar`, making it available to tool handlers. OAuth tokens are cached with a ~4.5 min TTL.
+
+At startup, the gateway discovers tools from all upstream servers using its own credentials (including password grant for OIDC servers). Tool names are namespaced as `{server}__{tool}` (e.g., `weather__get_forecast`).
 
 ### Keycloak Hostname
 
@@ -162,7 +175,9 @@ curl -X POST http://localhost:9004/mcp -H "Content-Type: application/json" \
 ## Conventions
 
 - MCP server entry points are registered as `[project.scripts]` in pyproject.toml
-- Server names in docker-compose match gateway `config/servers.yaml`
+- Server names in docker-compose match gateway `config/servers.yaml` (with `auth_type` per server)
+- Gateway uses `mcp.server.Server` (low-level) not `FastMCP` — raw dict passthrough for proxy tools
+- Gateway exposes tools namespaced as `{server}__{tool}` with original `inputSchema` preserved
 - Credentials template is in `infra/credentials.yaml` — never commit real secrets
 - `.env` is gitignored; copy from `.env.example`
 - Docker-compose Keycloak uses `--hostname http://localhost:8180 --hostname-backchannel-dynamic true`

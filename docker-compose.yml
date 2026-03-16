@@ -96,7 +96,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # ── MCP Gateway (aggregating proxy) ─────────────
+  # ── MCP Gateway (smart auth proxy) ───────────────
   gateway:
     build:
       context: .
@@ -105,16 +105,26 @@ services:
       - "8000:8000"
     env_file: .env
     environment:
-      MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-mcp}
+      OAUTH_CLIENT_ID: mcp-gateway
+      OAUTH_CLIENT_SECRET: gateway-secret
+      OIDC_USERNAME: testuser
+      OIDC_PASSWORD: testpass
       GATEWAY_PORT: "8000"
+      GATEWAY_SERVERS_CONFIG: /app/config/servers.yaml
       CREDENTIALS_FILE: /app/infra/credentials.yaml
     depends_on:
-      - weather-server
-      - stock-server
-      - calculator-server
-      - greeting-server
+      keycloak:
+        condition: service_healthy
+      weather-server:
+        condition: service_started
+      stock-server:
+        condition: service_started
+      calculator-server:
+        condition: service_started
+      greeting-server:
+        condition: service_started
 
   # ── Registry ─────────────────────────────────────
   registry-backend:
